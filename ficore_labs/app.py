@@ -274,7 +274,6 @@ def create_app():
         raise ValueError('MONGO_URI must be set')
 
     # Add server name configuration for URL building
-    app.config['SERVER_NAME'] = os.getenv('SERVER_NAME')
     app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/')
     app.config['PREFERRED_URL_SCHEME'] = os.getenv('PREFERRED_URL_SCHEME', 'http')
 
