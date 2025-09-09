@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask import (
     Flask, jsonify, request, render_template, redirect, url_for, flash,
@@ -16,7 +16,7 @@ from functools import wraps
 from pymongo import MongoClient
 import certifi
 from flask_login import LoginManager, login_required, current_user, UserMixin, logout_user
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_babel import Babel
 from flask_compress import Compress
 from flask_limiter import Limiter
@@ -24,8 +24,7 @@ from flask_limiter.util import get_remote_address
 from blueprints.users.routes import get_post_login_redirect
 from utils import (
     get_mongo_db, logger, initialize_tools_with_urls, generate_tools_with_urls,
-    TRADER_TOOLS, TRADER_NAV, ADMIN_TOOLS, ADMIN_NAV,
-    _TRADER_NAV, _ADMIN_NAV, _TRADER_TOOLS, _ADMIN_TOOLS, format_date
+    TRADER_TOOLS, TRADER_NAV, ADMIN_TOOLS, ADMIN_NAV, format_date
 )
 from translations import register_translation, trans, get_translations, get_all_translations, get_module_translations
 
