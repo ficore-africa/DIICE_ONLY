@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
+
+
+<url>
+  <loc>https://ficoreafrica.com/general/landing</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>1.00</priority>
+</url>
+<url>
+  <loc>https://ficoreafrica.com/general/users/login?next=%2Fgeneral%2Fhome</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://ficoreafrica.com/general/about</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://ficoreafrica.com/general/waitlist</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://ficoreafrica.com/general/terms</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://ficoreafrica.com/general/privacy</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://ficoreafrica.com/general/feedback</loc>
+  <lastmod>2025-09-02T17:14:20+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+
+
+</urlset>
