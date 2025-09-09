@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="{{ lang | e }}">
+<head>
+    {% extends "base.html" %}
+    {% block title %}{{ title | e }}{% endblock %}
+    {% block extra_head %}
+    <style>
+        .subscription-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .subscription-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #fff;
+        }
+        .subscription-status {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .payment-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .payment-info h4 {
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+        .payment-details {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .payment-details strong {
+            color: #495057;
+        }
+        .upload-form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-upload {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-upload:hover {
+            background-color: #0056b3;
+        }
+        .receipts-history {
+            margin-top: 30px;
+        }
+        .receipt-item {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .receipt-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-rejected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .dark-mode .subscription-card {
+            background-color: #333;
+            border-color: #444;
+            color: #fff;
+        }
+        .dark-mode .payment-info {
+            background-color: #444;
+            color: #fff;
+        }
+        .dark-mode .upload-form {
+            background-color: #333;
+            border-color: #444;
+            color: #fff;
+        }
+        .dark-mode .form-control {
+            background-color: #444;
+            border-color: #555;
+            color: #fff;
+        }
+        .dark-mode .receipt-item {
+            background-color: #444;
+            border-color: #555;
+            color: #fff;
+        }
+    </style>
+    {% endblock %}
+</head>
+<body>
+    {% block content %}
+    <div class="subscription-container">
+        <h1 class="text-center mb-4">{{ title | e }}</h1>
+        
+        <!-- Current Subscription Status -->
+        <div class="subscription-card subscription-status">
+            {% if current_user.is_subscribed %}
+                <h3 class="text-success">{{ t('subscribe_active', default='Active Subscription') | e }}</h3>
+                <p>{{ t('subscribe_plan', default='Plan') | e }}: {{ current_user.subscription_plan|capitalize | e }}</p>
+                <p>{{ t('subscribe_expires', default='Expires on') | e }}: {{ current_user.subscription_end | format_date | e }}</p>
+            {% elif current_user.is_trial and not is_trial_expired(current_user.trial_end, current_user.is_trial, current_user.is_subscribed, current_user.subscription_end) %}
+                <h3 class="text-info">{{ t('subscribe_trial_active', default='Trial Active') | e }}</h3>
+                <p>{{ t('subscribe_trial_expires', default='Trial expires on') | e }}: {{ current_user.trial_end | format_date | e }}</p>
+            {% else %}
+                <h3 class="text-warning">{{ t('subscribe_no_active', default='No Active Subscription') | e }}</h3>
+                <p>{{ t('subscribe_upgrade_prompt', default='Upgrade to continue accessing all features') | e }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Payment Information -->
+        <div class="subscription-card">
+            <div class="payment-info">
+                <h4>{{ t('subscribe_payment_info', default='Payment Information') | e }}</h4>
+                <p>{{ t('subscribe_payment_instructions', default='Make payment to the account below and upload your receipt for verification:') | e }}</p>
+                
+                <div class="payment-details">
+                    <strong>{{ t('subscribe_bank', default='Bank') | e }}:</strong>
+                    <span>{{ payment_info.bank | e }}</span>
+                </div>
+                <div class="payment-details">
+                    <strong>{{ t('subscribe_account_name', default='Account Name') | e }}:</strong>
+                    <span>{{ payment_info.account_name | e }}</span>
+                </div>
+                <div class="payment-details">
+                    <strong>{{ t('subscribe_account_number', default='Account Number') | e }}:</strong>
+                    <span>{{ payment_info.account_number | e }}</span>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <strong>{{ t('subscribe_pricing', default='Pricing') | e }}:</strong><br>
+                    • {{ t('subscribe_monthly_plan', default='Monthly Plan') | e }}: ₦1,000<br>
+                    • {{ t('subscribe_yearly_plan', default='Yearly Plan') | e }}: ₦10,000 ({{ t('subscribe_save', default='Save 17%') | e }})
+                </div>
+            </div>
+        </div>
+
+        <!-- Receipt Upload Form -->
+        <div class="subscription-card">
+            <h4>{{ t('subscribe_upload_receipt', default='Upload Payment Receipt') | e }}</h4>
+            <form method="POST" action="{{ url_for('subscribe_bp.upload_receipt') }}" enctype="multipart/form-data" class="upload-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="form-group">
+                    <label for="plan_type">{{ t('subscribe_select_plan', default='Select Plan') | e }}</label>
+                    <select name="plan_type" id="plan_type" class="form-control" required>
+                        <option value="">{{ t('subscribe_choose_plan', default='Choose a plan') | e }}</option>
+                        <option value="monthly" {% if request.args.get('plan_code') == 'monthly' %}selected{% endif %}>{{ t('subscribe_monthly_plan', default='Monthly Plan') | e }} - ₦1,000</option>
+                        <option value="yearly" {% if request.args.get('plan_code') == 'yearly' %}selected{% endif %}>{{ t('subscribe_yearly_plan', default='Yearly Plan') | e }} - ₦10,000</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="amount_paid">{{ t('subscribe_amount_paid', default='Amount Paid') | e }}</label>
+                    <input type="number" name="amount_paid" id="amount_paid" class="form-control" min="1000" step="0.01" required value="{% if request.args.get('plan_code') == 'monthly' %}1000{% elif request.args.get('plan_code') == 'yearly' %}10000{% endif %}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="payment_date">{{ t('subscribe_payment_date', default='Payment Date') | e }}</label>
+                    <input type="date" name="payment_date" id="payment_date" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="receipt">{{ t('subscribe_receipt_file', default='Receipt File') | e }}</label>
+                    <input type="file" name="receipt" id="receipt" class="form-control" accept=".png,.jpg,.jpeg,.pdf" required>
+                    <small class="text-muted">{{ t('subscribe_file_types', default='Accepted formats: PNG, JPG, JPEG, PDF') | e }}</small>
+                </div>
+                
+                <button type="submit" class="btn-upload">{{ t('subscribe_upload', default='Upload Receipt') | e }}</button>
+            </form>
+        </div>
+
+        <!-- Receipts History -->
+        {% if receipts %}
+        <div class="subscription-card receipts-history">
+            <h4>{{ t('subscribe_receipt_history', default='Receipt History') | e }}</h4>
+            {% for receipt in receipts %}
+            <div class="receipt-item">
+                <div>
+                    <strong>{{ receipt.plan_type|capitalize | e }} Plan</strong> - {{ receipt.amount_paid | format_currency | e }}<br>
+                    <small>{{ t('subscribe_uploaded', default='Uploaded') | e }}: {{ receipt.uploaded_at | format_date | e }}</small>
+                </div>
+                <span class="receipt-status status-{{ receipt.status | e }}">
+                    {% if receipt.status == 'pending' %}
+                        {{ t('subscribe_status_pending', default='Pending Review') | e }}
+                    {% elif receipt.status == 'approved' %}
+                        {{ t('subscribe_status_approved', default='Approved') | e }}
+                    {% elif receipt.status == 'rejected' %}
+                        {{ t('subscribe_status_rejected', default='Rejected') | e }}
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Alternative Payment Method -->
+        <div class="subscription-card text-center">
+            <h4>{{ t('subscribe_alternative_payment', default='Alternative Payment Method') | e }}</h4>
+            <p>{{ t('subscribe_paystack_option', default='You can also pay online using our secure Paystack integration:') | e }}</p>
+            <a href="{{ url_for('subscribe_bp.subscribe') }}" class="btn btn-success">
+                {{ t('subscribe_pay_online', default='Pay Online with Paystack') | e }}
+            </a>
+        </div>
+    </div>
+    {% endblock %}
+</body>
+</html>
+

@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% block title %}{{ t('view_data_title', default='View Financial Data') | e }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <!-- Back Button -->
+    <div class="d-flex align-items-center mb-4">
+        <button onclick="history.back()" class="btn btn-outline-secondary me-3" aria-label="{{ t('general_back', default='Back') | e }}">
+            <i class="bi bi-arrow-left"></i> {{ t('general_back', default='Back') | e }}
+        </button>
+        <h1 class="mb-0">{{ t('view_data_title', default='View Financial Data') | e }}</h1>
+    </div>
+
+    {% if is_read_only %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle me-2"></i>
+        {{ t('view_data_read_only_notice', default='You are viewing your data in read-only mode. Subscribe to add or edit records.') | e }}
+        <a href="{{ url_for('subscribe_bp.subscribe') | e }}" class="btn btn-primary btn-sm ms-2">
+            {{ t('subscribe_button', default='Subscribe Now') | e }}
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Debt Records Section -->
+    <div class="section-card mb-4">
+        <h3 class="section-title">{{ t('view_data_debt_records', default='Debt Records') | e }}</h3>
+        {% if debt_records %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{{ t('view_data_type', default='Type') | e }}</th>
+                        <th>{{ t('view_data_name', default='Name') | e }}</th>
+                        <th>{{ t('view_data_amount', default='Amount Owed') | e }}</th>
+                        <th>{{ t('view_data_date', default='Date Created') | e }}</th>
+                        <th>{{ t('view_data_description', default='Description') | e }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in debt_records %}
+                    <tr>
+                        <td>
+                            <span class="badge {{ 'bg-success' if record.type == 'debtor' else 'bg-danger' }}">
+                                {{ record.type | capitalize | e }}
+                            </span>
+                        </td>
+                        <td>{{ record.name | e }}</td>
+                        <td>{{ format_currency(record.amount_owed) }}</td>
+                        <td>{{ record.created_at | format_datetime | e }}</td>
+                        <td>{{ record.description | e if record.description else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="bi bi-inbox display-4 text-muted"></i>
+            <p class="text-muted mt-2">{{ t('view_data_no_debt_records', default='No debt records found.') | e }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Cashflow Records Section -->
+    <div class="section-card mb-4">
+        <h3 class="section-title">{{ t('view_data_cashflow_records', default='Cashflow Records') | e }}</h3>
+        {% if cashflows %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{{ t('view_data_type', default='Type') | e }}</th>
+                        <th>{{ t('view_data_party', default='Party') | e }}</th>
+                        <th>{{ t('view_data_amount', default='Amount') | e }}</th>
+                        <th>{{ t('view_data_date', default='Date') | e }}</th>
+                        <th>{{ t('view_data_description', default='Description') | e }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cashflow in cashflows %}
+                    <tr>
+                        <td>
+                            <span class="badge {{ 'bg-success' if cashflow.type == 'receipt' else 'bg-danger' }}">
+                                {{ cashflow.type | capitalize | e }}
+                            </span>
+                        </td>
+                        <td>{{ cashflow.party_name | e if cashflow.party_name else '-' }}</td>
+                        <td>{{ format_currency(cashflow.amount) }}</td>
+                        <td>{{ cashflow.created_at | format_datetime | e }}</td>
+                        <td>{{ cashflow.description | e if cashflow.description else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="bi bi-inbox display-4 text-muted"></i>
+            <p class="text-muted mt-2">{{ t('view_data_no_cashflow_records', default='No cashflow records found.') | e }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="section-card">
+                <h4 class="text-center">{{ t('view_data_debt_summary', default='Debt Summary') | e }}</h4>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <div class="stat-value text-danger">
+                                {{ format_currency(debt_records | selectattr('type', 'equalto', 'creditor') | sum(attribute='amount_owed')) }}
+                            </div>
+                            <div class="stat-label">{{ t('general_i_owe', default='I Owe') | e }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <div class="stat-value text-success">
+                                {{ format_currency(debt_records | selectattr('type', 'equalto', 'debtor') | sum(attribute='amount_owed')) }}
+                            </div>
+                            <div class="stat-label">{{ t('general_i_am_owed', default='I Am Owed') | e }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="section-card">
+                <h4 class="text-center">{{ t('view_data_cashflow_summary', default='Cashflow Summary') | e }}</h4>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <div class="stat-value text-success">
+                                {{ format_currency(cashflows | selectattr('type', 'equalto', 'receipt') | sum(attribute='amount')) }}
+                            </div>
+                            <div class="stat-label">{{ t('general_receipts', default='Receipts') | e }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <div class="stat-value text-danger">
+                                {{ format_currency(cashflows | selectattr('type', 'equalto', 'payment') | sum(attribute='amount')) }}
+                            </div>
+                            <div class="stat-label">{{ t('general_payments', default='Payments') | e }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="text-center mt-4">
+        <a href="{{ url_for('general_bp.home') | e }}" class="btn btn-primary me-2">
+            <i class="bi bi-house"></i> {{ t('general_back_to_home', default='Back to Home') | e }}
+        </a>
+        {% if not is_read_only %}
+        <a href="{{ url_for('debtors.index') | e }}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-person-plus"></i> {{ t('general_manage_debtors', default='Manage Debtors') | e }}
+        </a>
+        <a href="{{ url_for('receipts.index') | e }}" class="btn btn-outline-primary">
+            <i class="bi bi-cash-coin"></i> {{ t('general_manage_cashflow', default='Manage Cashflow') | e }}
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.stat-item {
+    padding: 1rem;
+}
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.stat-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+.section-card {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid #dee2e6;
+}
+.section-title {
+    margin-bottom: 1rem;
+    color: #495057;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(tooltipTriggerEl => {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-receipt"></i> {{ t('admin_receipt_details', default='Receipt Details') }}
+                    </h4>
+                    <a href="{{ url_for('admin.manage_receipts') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> {{ t('general_back', default='Back') }}
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>{{ t('admin_receipt_information', default='Receipt Information') }}</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>{{ t('admin_receipt_id', default='Receipt ID') }}:</strong></td>
+                                    <td>{{ receipt._id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_filename', default='Filename') }}:</strong></td>
+                                    <td>{{ receipt.filename }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_plan_type', default='Plan Type') }}:</strong></td>
+                                    <td>
+                                        <span class="badge bg-info">
+                                            {{ receipt.plan_type.title() }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_amount_paid', default='Amount Paid') }}:</strong></td>
+                                    <td>{{ "₦{:,.2f}".format(receipt.amount_paid) }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_payment_date', default='Payment Date') }}:</strong></td>
+                                    <td>{{ receipt.payment_date.strftime('%Y-%m-%d') if receipt.payment_date else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_upload_date', default='Upload Date') }}:</strong></td>
+                                    <td>{{ receipt.uploaded_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.uploaded_at else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_status', default='Status') }}:</strong></td>
+                                    <td>
+                                        {% if receipt.status == 'pending' %}
+                                            <span class="badge bg-warning">{{ t('admin_status_pending', default='Pending') }}</span>
+                                        {% elif receipt.status == 'approved' %}
+                                            <span class="badge bg-success">{{ t('admin_status_approved', default='Approved') }}</span>
+                                        {% elif receipt.status == 'rejected' %}
+                                            <span class="badge bg-danger">{{ t('admin_status_rejected', default='Rejected') }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>{{ t('admin_user_information', default='User Information') }}</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>{{ t('admin_user_id', default='User ID') }}:</strong></td>
+                                    <td>{{ receipt.user_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_user_email', default='Email') }}:</strong></td>
+                                    <td>{{ receipt.user_email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ t('admin_user_name', default='Display Name') }}:</strong></td>
+                                    <td>{{ receipt.user_display_name }}</td>
+                                </tr>
+                            </table>
+                            
+                            {% if receipt.status == 'approved' %}
+                                <h5 class="mt-4">{{ t('admin_approval_details', default='Approval Details') }}</h5>
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>{{ t('admin_approved_by', default='Approved By') }}:</strong></td>
+                                        <td>{{ receipt.approved_by }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>{{ t('admin_approved_at', default='Approved At') }}:</strong></td>
+                                        <td>{{ receipt.approved_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.approved_at else 'N/A' }}</td>
+                                    </tr>
+                                </table>
+                            {% elif receipt.status == 'rejected' %}
+                                <h5 class="mt-4">{{ t('admin_rejection_details', default='Rejection Details') }}</h5>
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>{{ t('admin_rejected_by', default='Rejected By') }}:</strong></td>
+                                        <td>{{ receipt.rejected_by }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>{{ t('admin_rejected_at', default='Rejected At') }}:</strong></td>
+                                        <td>{{ receipt.rejected_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.rejected_at else 'N/A' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>{{ t('admin_rejection_reason', default='Reason') }}:</strong></td>
+                                        <td>{{ receipt.rejection_reason or 'N/A' }}</td>
+                                    </tr>
+                                </table>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if receipt.status == 'pending' %}
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h5>{{ t('admin_actions', default='Actions') }}</h5>
+                                <div class="d-flex gap-2">
+                                    <form method="POST" action="{{ url_for('admin_receipt.approve_receipt', receipt_id=receipt._id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-success" onclick="return confirm('{{ t('admin_confirm_approve', default='Are you sure you want to approve this receipt?') }}')">
+                                            <i class="bi bi-check-circle"></i> {{ t('admin_approve', default='Approve') }}
+                                        </button>
+                                    </form>
+                                    
+                                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                                        <i class="bi bi-x-circle"></i> {{ t('admin_reject', default='Reject') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rejectModalLabel">{{ t('admin_reject_receipt', default='Reject Receipt') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('general_close', default='Close') }}"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_receipt.reject_receipt', receipt_id=receipt._id) }}">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">{{ t('admin_rejection_reason', default='Rejection Reason') }} <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="reason" name="reason" rows="3" required placeholder="{{ t('admin_rejection_reason_placeholder', default='Please provide a reason for rejecting this receipt...') }}"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_cancel', default='Cancel') }}</button>
+                    <button type="submit" class="btn btn-danger">{{ t('admin_reject', default='Reject') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

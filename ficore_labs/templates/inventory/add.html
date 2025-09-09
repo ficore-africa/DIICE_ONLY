@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}{{ t('inventory_add_title', default='Add Inventory Item') }} - FiCore{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <!-- Back Button -->
+    <div class="d-flex align-items-center mb-4">
+        <button onclick="history.back()" class="btn btn-outline-secondary me-3" aria-label="{{ t('general_back', default='Back') | e }}">
+            <i class="bi bi-arrow-left"></i> {{ t('general_back', default='Back') | e }}
+        </button>
+        <a href="{{ url_for('inventory.index') | e }}" class="btn btn-link text-decoration-none">
+            <i class="bi bi-list"></i> {{ t('inventory_back_to_list', default='Back to Inventory List') | e }}
+        </a>
+    </div>
+
+    <div class="page-title">
+        <h1>{{ t('inventory_add_title', default='Add Inventory Item') }}</h1>
+        <small class="subtext">{{ t('inventory_subtitle', default='Add a new item to your inventory') }}</small>
+    </div>
+
+    {% if not can_interact %}
+        <div class="alert alert-warning" role="alert">
+            {{ t('inventory_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to add an inventory item.') }}
+            <a href="{{ url_for('general_bp.subscription_required') }}" class="alert-link">{{ t('general_subscribe', default='Subscribe now') }}</a>
+        </div>
+    {% endif %}
+
+    <form action="{{ url_for('inventory.add') }}" method="POST" class="row g-3" {% if not can_interact %}onsubmit="return false;"{% endif %}>
+        {{ form.hidden_tag() }}
+        <div class="col-12">
+            <label for="name" class="form-label">{{ t('inventory_name', default='Item Name') }}</label>
+            {{ form.name(class="form-control", required=True, disabled=not can_interact) }}
+            {% if form.name.errors %}
+                <p class="text-danger mt-1">{{ form.name.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="cost" class="form-label">{{ t('inventory_cost', default='Cost') }}</label>
+            {{ form.cost(class="form-control", type="number", step="0.01", required=True, disabled=not can_interact) }}
+            {% if form.cost.errors %}
+                <p class="text-danger mt-1">{{ form.cost.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="expected_margin" class="form-label">{{ t('inventory_expected_margin', default='Expected Margin') }}</label>
+            {{ form.expected_margin(class="form-control", type="number", step="0.01", required=True, disabled=not can_interact) }}
+            {% if form.expected_margin.errors %}
+                <p class="text-danger mt-1">{{ form.expected_margin.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary w-100" {% if not can_interact %}disabled{% endif %}>{{ t('general_submit', default='Add Item') }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

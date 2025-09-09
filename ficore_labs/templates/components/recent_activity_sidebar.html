@@ -1,0 +1,806 @@
+{% if current_user.is_authenticated %}
+<script>
+var userSidebarEnabled = {{ current_user.settings.get('activity_sidebar_enabled', True) | tojson }};
+if (!userSidebarEnabled) {
+    window.sidebarDisabled = true;
+    localStorage.setItem('sidebarDisabled', 'true');
+}
+</script>
+{% endif %}
+<!-- Persistent Toggle Button (always visible) -->
+<div class="sidebar-persistent-toggle" id="sidebarPersistentToggle" onclick="toggleActivitySidebar()">
+    <i class="bi bi-clock-history"></i>
+    <span class="toggle-tooltip">{{ t('general_recent_activity', default='Recent Activity') | e }}</span>
+</div>
+
+<div class="recent-activity-sidebar" id="recentActivitySidebar">
+    <div class="sidebar-header">
+        <button class="btn btn-sm btn-outline-secondary sidebar-toggle" onclick="toggleActivitySidebar()" aria-label="{{ t('general_toggle_sidebar', default='Toggle sidebar') | e }}">
+            <i class="bi bi-chevron-right" id="sidebarToggleIcon"></i>
+        </button>
+        <h6 class="sidebar-title">
+            <i class="bi bi-clock-history me-2"></i>
+            {{ t('general_recent_activity', default='Recent Activity') | e }}
+        </h6>
+        <div class="sidebar-drag-handle d-md-none" id="sidebarDragHandle">
+            <i class="bi bi-grip-horizontal"></i>
+        </div>
+    </div>
+    
+    <div class="sidebar-content" id="sidebarContent">
+        <div class="activity-list" id="activityList">
+            <div class="activity-item loading">
+                <div class="activity-icon">
+                    <div class="spinner-border spinner-border-sm text-muted" role="status">
+                        <span class="visually-hidden">{{ t('general_loading', default='Loading...') | e }}</span>
+                    </div>
+                </div>
+                <div class="activity-content">
+                    <div class="activity-description">{{ t('general_loading_activities', default='Loading activities...') | e }}</div>
+                    <div class="activity-time text-muted">{{ t('general_please_wait', default='Please wait') | e }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar-footer">
+            <!-- Primary Actions -->
+            <div class="d-flex gap-2 mb-2">
+                <a href="{{ url_for('receipts.add') }}" class="btn btn-sm btn-success w-100">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    {{ t('quick_add_sale', default='Add Sale') | e }}
+                </a>
+                <a href="{{ url_for('payments.add') }}" class="btn btn-sm btn-danger w-100">
+                    <i class="bi bi-dash-circle me-1"></i>
+                    {{ t('quick_add_expense', default='Add Expense') | e }}
+                </a>
+            </div>
+
+            <!-- Secondary Actions -->
+            <div class="d-flex flex-column gap-2 mb-2">
+                <a href="{{ url_for('debtors.add') }}" class="btn btn-sm btn-outline-success w-100 smaller-btn">
+                    <i class="bi bi-person-plus-fill me-1"></i>
+                    {{ t('quick_add_debtor', default='Add Debtor') | e }}
+                </a>
+                <a href="{{ url_for('creditors.add') }}" class="btn btn-sm btn-outline-danger w-100 smaller-btn">
+                    <i class="bi bi-person-dash-fill me-1"></i>
+                    {{ t('quick_add_creditor', default='Add Creditor') | e }}
+                </a>
+                <a href="{{ url_for('inventory.add') }}" class="btn btn-sm btn-outline-info w-100 smaller-btn">
+                    <i class="bi bi-box-seam me-1"></i>
+                    {{ t('quick_add_inventory', default='Add Inventory') | e }}
+                </a>
+            </div>
+
+            <!-- Tertiary Action -->
+            <a href="{{ url_for('business.view_data') | e }}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-eye me-1"></i>
+                {{ t('general_view_all_activity', default='View All Activity') | e }}
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Persistent Toggle Button */
+.sidebar-persistent-toggle {
+    position: fixed;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    width: 45px;
+    height: 45px;
+    background: rgba(0, 123, 255, 0.9);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1041;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.sidebar-persistent-toggle:hover {
+    background: rgba(0, 123, 255, 1);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+}
+
+.sidebar-persistent-toggle.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) scale(0.8);
+}
+
+.toggle-tooltip {
+    position: absolute;
+    right: 55px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-persistent-toggle:hover .toggle-tooltip {
+    opacity: 1;
+}
+
+.recent-activity-sidebar {
+    position: fixed;
+    top: 50%;
+    right: -280px;
+    transform: translateY(-50%);
+    width: 320px;
+    max-height: 80vh;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(15px);
+    border-radius: 12px 0 0 12px;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: none;
+    z-index: 1040;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    touch-action: none;
+}
+
+.recent-activity-sidebar.expanded {
+    right: 0;
+}
+
+.recent-activity-sidebar.disabled {
+    display: none;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 12px 0 0 0;
+    position: relative;
+}
+
+.sidebar-drag-handle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    color: #6c757d;
+    cursor: grab;
+    padding: 5px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.sidebar-drag-handle:active {
+    cursor: grabbing;
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.sidebar-drag-handle:hover {
+    color: #007bff;
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.sidebar-title {
+    margin: 0;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.sidebar-toggle图形 {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+    border-color: #007bff;
+}
+
+.sidebar-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.activity-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    max-height: calc(80vh - 120px);
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateX(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.activity-item:last-child {
+    margin-bottom: 0;
+}
+
+.activity-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(0, 123, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+}
+
+.activity-icon i {
+    font-size: 0.9rem;
+}
+
+.activity-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-description {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.activity-time {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.activity-amount {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.sidebar-footer {
+    padding: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(248, 249, 250, 0.8);
+}
+
+/* Smaller buttons for secondary actions */
+.smaller-btn {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.smaller-btn i {
+    font-size: 0.8rem;
+}
+
+/* Activity type specific colors */
+.activity-icon.debtor { background: rgba(40, 167, 69, 0.1); }
+.activity-icon.creditor { background: rgba(220, 53, 69, 0.1); }
+.activity-icon.receipt { background: rgba(40, 167, 69, 0.1); }
+.activity-icon.payment { background: rgba(220, 53, 69, 0.1); }
+.activity-icon.forecast { background: rgba(23, 162, 184, 0.1); }
+.activity-icon.fund { background: rgba(255, 193, 7, 0.1); }
+.activity-icon.report { background: rgba(108, 117, 125, 0.1); }
+
+/* Dark mode support */
+.dark-mode .sidebar-persistent-toggle {
+    background: rgba(0, 123, 255, 0.9);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.dark-mode .sidebar-persistent-toggle:hover {
+    background: rgba(0, 123, 255, 1);
+}
+
+.dark-mode .toggle-tooltip {
+    background: rgba(255, 255, 255, 0.9);
+    color: #212529;
+}
+
+.dark-mode .recent-activity-sidebar {
+    background: rgba(33, 37, 41, 0.98);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .sidebar-header {
+    background: rgba(52, 58, 64, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .sidebar-title {
+    color: #f8f9fa;
+}
+
+.dark-mode .sidebar-drag-handle {
+    color: #adb5bd;
+}
+
+.dark-mode .sidebar-drag-handle:hover {
+    color: #007bff;
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.dark-mode .activity-item {
+    background: rgba(52, 58, 64, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .activity-item:hover {
+    background: rgba(52, 58, 64, 0.9);
+}
+
+.dark-mode .activity-description {
+    color: #f8f9fa;
+}
+
+.dark-mode .activity-time {
+    color: #adb5bd;
+}
+
+.dark-mode .sidebar-footer {
+    background: rgba(52, 58, 64, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .btn-outline-success {
+    color: #28a745;
+    border-color: #28a745;
+}
+
+.dark-mode .btn-outline-success:hover {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.dark-mode .btn-outline-danger {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.dark-mode .btn-outline-danger:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.dark-mode .btn-outline-info {
+    color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.dark-mode .btn-outline-info:hover {
+    background-color: rgba(23, 162, 184, 0.1);
+    color: #17a2b8;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .sidebar-persistent-toggle {
+        width: 40px;
+        height: 40px;
+        right: 8px;
+    }
+    
+    .toggle-tooltip {
+        right: 50px;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    .recent-activity-sidebar {
+        width: 280px;
+        right: -240px;
+        top: 20%;
+        transform: translateY(0);
+        max-height: 70vh;
+    }
+    
+    .recent-activity-sidebar.expanded {
+        right: 0;
+    }
+    
+    .recent-activity-sidebar.dragging {
+        transition: none;
+    }
+    
+    .sidebar-header {
+        padding: 0.75rem;
+        padding-right: 3rem;
+    }
+    
+    .sidebar-title {
+        font-size: 0.85rem;
+    }
+    
+    .activity-item {
+        padding: 0.5rem;
+    }
+    
+    .activity-description {
+        font-size: 0.8rem;
+    }
+    
+    .activity-time {
+        font-size: 0.7rem;
+    }
+
+    .smaller-btn {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.4rem;
+    }
+
+    .smaller-btn i {
+        font-size: 0.75rem;
+    }
+}
+
+/* Hide on very small screens */
+@media (max-width: 576px) {
+    .recent-activity-sidebar:not(.disabled) {
+        display: block;
+    }
+}
+
+/* Custom scrollbar */
+.activity-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.activity-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 2px;
+}
+
+.activity-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+}
+
+.activity-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .activity-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .activity-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.dark-mode .activity-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+</style>
+
+<script>
+let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+let sidebarDisabled = localStorage.getItem('sidebarDisabled') === 'true';
+let activityData = [];
+let isDragging = false;
+let startY, startTop, currentTop;
+
+// Initialize sidebar state
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('recentActivitySidebar');
+    const persistentToggle = document.getElementById('sidebarPersistentToggle');
+    const dragHandle = document.getElementById('sidebarDragHandle');
+    
+    // Check user preference from server-side setting
+    {% if current_user.is_authenticated %}
+    var userSidebarEnabled = {{ current_user.settings.get('activity_sidebar_enabled', True) | tojson }};
+    if (!userSidebarEnabled) {
+        sidebarDisabled = true;
+        localStorage.setItem('sidebarDisabled', 'true');
+    }
+    {% endif %}
+    
+    updateSidebarVisibility();
+    
+    // Initialize drag for mobile
+    if (window.innerWidth <= 768 && dragHandle) {
+        dragHandle.addEventListener('touchstart', startDragging, { passive: false });
+        document.addEventListener('touchmove', dragSidebar, { passive: false });
+        document.addEventListener('touchend', stopDragging);
+        
+        // Set initial position from localStorage
+        const savedTop = localStorage.getItem('sidebarTop');
+        if (savedTop) {
+            currentTop = parseInt(savedTop);
+            sidebar.style.top = currentTop + 'px';
+        } else {
+            currentTop = window.innerHeight * 0.2; // Default 20% from top
+        }
+    }
+    
+    // Auto-expand on desktop if not disabled
+    if (!sidebarDisabled && window.innerWidth > 768) {
+        if (localStorage.getItem('sidebarExpanded') === 'true') {
+            toggleActivitySidebar();
+        } else {
+            setTimeout(() => toggleActivitySidebar(), 1000);
+        }
+    }
+});
+
+// Update sidebar visibility based on settings
+function updateSidebarVisibility() {
+    const sidebar = document.getElementById('recentActivitySidebar');
+    const persistentToggle = document.getElementById('sidebarPersistentToggle');
+    
+    if (sidebarDisabled) {
+        sidebar.classList.add('disabled');
+        persistentToggle.classList.add('hidden');
+        sidebar.classList.remove('expanded');
+        sidebarExpanded = false;
+        localStorage.setItem('sidebarExpanded', false);
+    } else {
+        sidebar.classList.remove('disabled');
+        persistentToggle.classList.remove('hidden');
+    }
+}
+
+// Toggle sidebar visibility
+function toggleActivitySidebar() {
+    if (sidebarDisabled) return;
+    
+    const sidebar = document.getElementById('recentActivitySidebar');
+    const icon = document.getElementById('sidebarToggleIcon');
+    const persistentToggle = document.getElementById('sidebarPersistentToggle');
+    
+    sidebarExpanded = !sidebarExpanded;
+    localStorage.setItem('sidebarExpanded', sidebarExpanded);
+    
+    if (sidebarExpanded) {
+        sidebar.classList.add('expanded');
+        icon.className = 'bi bi-chevron-left';
+        persistentToggle.classList.add('hidden');
+        loadRecentActivitySidebar();
+    } else {
+        sidebar.classList.remove('expanded');
+        icon.className = 'bi bi-chevron-right';
+        persistentToggle.classList.remove('hidden');
+    }
+}
+
+// Toggle sidebar disable/enable via user settings
+function toggleSidebarSetting(enabled) {
+    sidebarDisabled = !enabled;
+    localStorage.setItem('sidebarDisabled', sidebarDisabled);
+    
+    // Update server-side setting
+    {% if current_user.is_authenticated %}
+    updateUserSidebarSetting(enabled);
+    {% endif %}
+    
+    updateSidebarVisibility();
+    
+    if (!sidebarDisabled && window.innerWidth > 768) {
+        setTimeout(() => toggleActivitySidebar(), 100);
+    }
+}
+
+// Update user setting on server
+function updateUserSidebarSetting(enabled) {
+    fetch('{{ url_for("settings.update_user_setting") | e }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({
+            setting: 'activitySidebarToggle',
+            value: enabled
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Failed to update sidebar setting:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating sidebar setting:', error);
+    });
+}
+
+// Drag functionality for mobile
+function startDragging(e) {
+    if (sidebarDisabled || window.innerWidth > 768) return;
+    
+    e.preventDefault();
+    isDragging = true;
+    startY = e.touches[0].clientY;
+    
+    const sidebar = document.getElementById('recentActivitySidebar');
+    const rect = sidebar.getBoundingClientRect();
+    startTop = rect.top;
+    currentTop = startTop;
+    
+    sidebar.classList.add('dragging');
+}
+
+function dragSidebar(e) {
+    if (!isDragging || sidebarDisabled || window.innerWidth > 768) return;
+    
+    e.preventDefault();
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - startY;
+    
+    // Calculate new position with constraints
+    const sidebar = document.getElementById('recentActivitySidebar');
+    const sidebarHeight = sidebar.offsetHeight;
+    const minTop = 10;
+    const maxTop = window.innerHeight - sidebarHeight - 10;
+    
+    currentTop = Math.min(Math.max(startTop + deltaY, minTop), maxTop);
+    sidebar.style.top = `${currentTop}px`;
+}
+
+function stopDragging() {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    const sidebar = document.getElementById('recentActivitySidebar');
+    sidebar.classList.remove('dragging');
+    
+    // Save position to localStorage
+    localStorage.setItem('sidebarTop', currentTop.toString());
+}
+
+// Load recent activity data
+function loadRecentActivitySidebar() {
+    {% if current_user.is_authenticated %}
+    fetch('{{ url_for("business.recent_activity") | e }}', { 
+        credentials: 'include',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Failed to load activity');
+        return response.json();
+    })
+    .then(activities => {
+        activityData = activities;
+        renderSidebarActivities(activities.slice(0, 5));
+    })
+    .catch(error => {
+        console.error('Error loading sidebar activity:', error);
+        renderSidebarActivities([]);
+    });
+    {% endif %}
+}
+
+// Render activities in sidebar
+function renderSidebarActivities(activities) {
+    const activityList = document.getElementById('activityList');
+    
+    if (activities && activities.length > 0) {
+        activityList.innerHTML = activities.map(activity => `
+            <div class="activity-item">
+                <div class="activity-icon ${getActivityType(activity.type)}">
+                    <i class="bi ${getActivityIcon(activity.type)} ${getActivityIconColor(activity.type)}"></i>
+                </div>
+                <div class="activity-content">
+                    <div class="activity-description">${activity.description}</div>
+                    <div class="activity-time">${formatTimeAgo(activity.timestamp)}</div>
+                    ${activity.amount ? `<div class="activity-amount ${getAmountColor(activity.type)}">${formatCurrency(activity.amount)}</div>` : ''}
+                </div>
+            </div>
+        `).join('');
+    } else {
+        activityList.innerHTML = `
+            <div class="activity-item">
+                <div class="activity-icon">
+                    <i class="bi bi-info-circle text-muted"></i>
+                </div>
+                <div class="activity-content">
+                    <div class="activity-description">{{ t('general_no_recent_activity', default='No recent activity') | e }}</div>
+                    <div class="activity-time">{{ t('general_start_adding', default='Start by adding transactions') | e }}</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Helper functions for activity rendering
+function getActivityType(type) {
+    const typeMap = {
+        'debtor_added': 'debtor',
+        'creditor_added': 'creditor',
+        'money_in': 'receipt',
+        'money_out': 'payment',
+        'forecast_added': 'forecast',
+        'fund_added': 'fund',
+        'report_generated': 'report'
+    };
+    return typeMap[type] || 'default';
+}
+
+function getActivityIcon(type) {
+    const iconMap = {
+        'debtor_added': 'bi-person-plus',
+        'creditor_added': 'bi-person-plus',
+        'money_in': 'bi-arrow-down-circle',
+        'money_out': 'bi-arrow-up-circle',
+        'forecast_added': 'bi-graph-up',
+        'fund_added': 'bi-piggy-bank',
+        'report_generated': 'bi-file-earmark-bar-graph',
+        'feedback_submitted': 'bi-star-fill'
+    };
+    return iconMap[type] || 'bi-circle';
+}
+
+function getActivityIconColor(type) {
+    const colorMap = {
+        'debtor_added': 'text-success',
+        'creditor_added': 'text-danger',
+        'money_in': 'text-success',
+        'money_out': 'text-danger',
+        'forecast_added': 'text-info',
+        'fund_added': 'text-warning',
+        'report_generated': 'text-secondary',
+        'feedback_submitted': 'text-warning'
+    };
+    return colorMap[type] || 'text-muted';
+}
+
+function getAmountColor(type) {
+    return type === 'money_in' || type === 'debtor_added' ? 'text-success' : 'text-danger';
+}
+
+function formatTimeAgo(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - time) / 1000);
+
+    if (diffInSeconds < 60) return '{{ t("general_just_now", default="Just now") | e }}';
+    if (diffInSeconds < 3600) return Math.floor(diffInSeconds / 60) + '{{ t("general_minutes_ago", default="m ago") | e }}';
+    if (diffInSeconds < 86400) return Math.floor(diffInSeconds / 3600) + '{{ t("general_hours_ago", default="h ago") | e }}';
+    return Math.floor(diffInSeconds / 86400) + '{{ t("general_days_ago", default="d ago") | e }}';
+}
+
+function formatCurrency(amount) {
+    if (!amount && amount !== 0) return '';
+    const value = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(value)) return '₦0';
+    return '₦' + value.toLocaleString('en-NG', {maximumFractionDigits: 0});
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>

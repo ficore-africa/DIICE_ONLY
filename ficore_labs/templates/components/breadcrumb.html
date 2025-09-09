@@ -1,0 +1,120 @@
+<!-- Breadcrumb Navigation Component -->
+{% set is_homepage = request.endpoint in ['general_bp.home', 'general_bp.landing'] %}
+{% set is_dashboard = request.endpoint == 'dashboard.index' %}
+{% set show_breadcrumb = not is_homepage and not is_dashboard and breadcrumb_items is defined and breadcrumb_items|length > 0 %}
+
+{% if show_breadcrumb %}
+<nav aria-label="breadcrumb" class="breadcrumb-nav">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('dashboard.index') if current_user.is_authenticated else url_for('general_bp.home') | e }}" class="breadcrumb-link">
+                <i class="bi bi-house-fill me-1"></i>
+                {{ t('general_home', default='Home') | e }}
+            </a>
+        </li>
+        {% for item in breadcrumb_items %}
+            {% if loop.last %}
+                <li class="breadcrumb-item active" aria-current="page">
+                    <i class="bi {{ item.icon | default('bi-circle') | e }} me-1"></i>
+                    {{ t(item.label_key, default=item.label) | e }}
+                </li>
+            {% else %}
+                <li class="breadcrumb-item">
+                    <a href="{{ item.url | e }}" class="breadcrumb-link">
+                        <i class="bi {{ item.icon | default('bi-circle') | e }} me-1"></i>
+                        {{ t(item.label_key, default=item.label) | e }}
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ol>
+</nav>
+{% endif %}
+
+<style>
+.breadcrumb-nav {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.breadcrumb {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+}
+
+.breadcrumb-item {
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-link {
+    color: #6c757d;
+    text-decoration: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-link:hover {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb-item.active {
+    color: #495057;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: ">";
+    color: #6c757d;
+    margin: 0 0.5rem;
+    font-weight: bold;
+}
+
+/* Dark mode support */
+.dark-mode .breadcrumb-nav {
+    background: rgba(33, 37, 41, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .breadcrumb-link {
+    color: #adb5bd;
+}
+
+.dark-mode .breadcrumb-link:hover {
+    color: #0d6efd;
+}
+
+.dark-mode .breadcrumb-item.active {
+    color: #f8f9fa;
+}
+
+.dark-mode .breadcrumb-item + .breadcrumb-item::before {
+    color: #adb5bd;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .breadcrumb-nav {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .breadcrumb {
+        font-size: 0.8rem;
+    }
+    
+    .breadcrumb-item + .breadcrumb-item::before {
+        margin: 0 0.25rem;
+    }
+}
+
+</style>

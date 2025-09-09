@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="{{ lang | e }}">
+<head>
+    {% extends "base.html" %}
+    {% block title %}{{ title | e }}{% endblock %}
+    {% block extra_head %}
+    <style>
+        .receipts-container {
+            padding: 20px;
+        }
+        .receipt-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #fff;
+        }
+        .receipt-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .receipt-info {
+            flex: 1;
+        }
+        .receipt-status {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-rejected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .receipt-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-label {
+            font-weight: 500;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+        }
+        .receipt-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-approve {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-approve:hover {
+            background-color: #218838;
+        }
+        .btn-reject {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-reject:hover {
+            background-color: #c82333;
+        }
+        .btn-view {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-view:hover {
+            background-color: #0056b3;
+        }
+        .rejection-form {
+            margin-top: 10px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            display: none;
+        }
+        .rejection-form textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .no-receipts {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .dark-mode .receipt-card {
+            background-color: #333;
+            border-color: #444;
+            color: #fff;
+        }
+        .dark-mode .detail-label {
+            color: #ccc;
+        }
+        .dark-mode .detail-value {
+            color: #fff;
+        }
+        .dark-mode .rejection-form {
+            background-color: #444;
+        }
+        .dark-mode .rejection-form textarea {
+            background-color: #555;
+            border-color: #666;
+            color: #fff;
+        }
+    </style>
+    {% endblock %}
+</head>
+<body>
+    {% block content %}
+    <div class="receipts-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ title | e }}</h1>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                {{ t('general_back_to_dashboard', default='Back to Dashboard') | e }}
+            </a>
+        </div>
+
+        {% if receipts %}
+            {% for receipt in receipts %}
+            <div class="receipt-card">
+                <div class="receipt-header">
+                    <div class="receipt-info">
+                        <h4>{{ receipt.user_display_name | e }} ({{ receipt.user_email | e }})</h4>
+                        <small class="text-muted">{{ t('admin_receipt_id', default='Receipt ID') | e }}: {{ receipt._id | e }}</small>
+                    </div>
+                    <span class="receipt-status status-{{ receipt.status | e }}">
+                        {% if receipt.status == 'pending' %}
+                            {{ t('subscribe_status_pending', default='Pending Review') | e }}
+                        {% elif receipt.status == 'approved' %}
+                            {{ t('subscribe_status_approved', default='Approved') | e }}
+                        {% elif receipt.status == 'rejected' %}
+                            {{ t('subscribe_status_rejected', default='Rejected') | e }}
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="receipt-details">
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('subscribe_plan_type', default='Plan Type') | e }}</span>
+                        <span class="detail-value">{{ receipt.plan_type|capitalize | e }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('subscribe_amount_paid', default='Amount Paid') | e }}</span>
+                        <span class="detail-value">₦{{ receipt.amount_paid | format_number | e }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('subscribe_payment_date', default='Payment Date') | e }}</span>
+                        <span class="detail-value">{{ receipt.payment_date | format_date | e }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('subscribe_uploaded', default='Uploaded') | e }}</span>
+                        <span class="detail-value">{{ receipt.uploaded_at | format_date | e }}</span>
+                    </div>
+                    {% if receipt.status == 'approved' %}
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('admin_approved_by', default='Approved By') | e }}</span>
+                        <span class="detail-value">{{ receipt.approved_by | e }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('admin_approved_at', default='Approved At') | e }}</span>
+                        <span class="detail-value">{{ receipt.approved_at | format_date | e }}</span>
+                    </div>
+                    {% elif receipt.status == 'rejected' %}
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('admin_rejected_by', default='Rejected By') | e }}</span>
+                        <span class="detail-value">{{ receipt.rejected_by | e }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">{{ t('admin_rejection_reason', default='Rejection Reason') | e }}</span>
+                        <span class="detail-value">{{ receipt.rejection_reason | e or 'No reason provided' }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="receipt-actions">
+                    <a href="/uploads/receipts/{{ receipt.filename | e }}" target="_blank" class="btn btn-view">
+                        {{ t('admin_view_receipt', default='View Receipt') | e }}
+                    </a>
+                    <a href="{{ url_for('admin_receipt.view_receipt', receipt_id=receipt._id) }}" class="btn btn-view">
+                        {{ t('admin_view_details', default='View Details') | e }}
+                    </a>
+                    
+                    {% if receipt.status == 'pending' %}
+                    <form method="POST" action="{{ url_for('admin_receipt.approve_receipt', receipt_id=receipt._id) }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-approve" onclick="return confirm('{{ t('admin_confirm_approve', default='Are you sure you want to approve this receipt and activate the subscription?') | e }}')">
+                            {{ t('admin_approve', default='Approve') | e }}
+                        </button>
+                    </form>
+                    
+                    <button type="button" class="btn btn-reject" onclick="toggleRejectionForm('{{ receipt._id | e }}')">
+                        {{ t('admin_reject', default='Reject') | e }}
+                    </button>
+                    
+                    <div id="rejection-form-{{ receipt._id | e }}" class="rejection-form">
+                        <form method="POST" action="{{ url_for('admin_receipt.reject_receipt', receipt_id=receipt._id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <textarea name="reason" placeholder="{{ t('admin_rejection_reason_placeholder', default='Enter reason for rejection (required)') | e }}" rows="3" required></textarea>
+                            <div>
+                                <button type="submit" class="btn btn-reject">
+                                    {{ t('admin_confirm_reject', default='Confirm Rejection') | e }}
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="toggleRejectionForm('{{ receipt._id | e }}')">
+                                    {{ t('general_cancel', default='Cancel') | e }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-receipts">
+                <h3>{{ t('admin_no_receipts', default='No payment receipts found') | e }}</h3>
+                <p>{{ t('admin_no_receipts_desc', default='Users will see their uploaded receipts here for review.') | e }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function toggleRejectionForm(receiptId) {
+            const form = document.getElementById('rejection-form-' + receiptId);
+            if (form.style.display === 'none' || form.style.display === '') {
+                form.style.display = 'block';
+            } else {
+                form.style.display = 'none';
+            }
+        }
+    </script>
+    {% endblock %}
+</body>
+</html>
