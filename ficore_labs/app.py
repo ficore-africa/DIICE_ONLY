@@ -24,8 +24,8 @@ from flask_limiter.util import get_remote_address
 from blueprints.users.routes import get_post_login_redirect
 from utils import (
     get_mongo_db, logger, initialize_tools_with_urls, generate_tools_with_urls,
-    TRADER_TOOLS, TRADER_NAV, STARTUP_TOOLS, STARTUP_NAV, ADMIN_TOOLS, ADMIN_NAV,
-    _TRADER_NAV, _STARTUP_NAV, _ADMIN_NAV, _TRADER_TOOLS, _STARTUP_TOOLS, _ADMIN_TOOLS, format_date
+    TRADER_TOOLS, TRADER_NAV, ADMIN_TOOLS, ADMIN_NAV,
+    _TRADER_NAV, _ADMIN_NAV, _TRADER_TOOLS, _ADMIN_TOOLS, format_date
 )
 from translations import register_translation, trans, get_translations, get_all_translations, get_module_translations
 
