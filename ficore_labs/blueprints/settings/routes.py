@@ -9,6 +9,7 @@ from models import User, get_user, update_user, create_kyc_record, update_kyc_re
 from bson import ObjectId
 from datetime import datetime, timezone
 from wtforms import StringField, TextAreaField, SubmitField, FileField
+from wtforms.fields import MultiCheckboxField
 from wtforms.validators import DataRequired, Length, Email, Optional
 from gridfs import GridFS
 from io import BytesIO
@@ -49,6 +50,18 @@ class ProfileForm(FlaskForm):
         Optional(),
         Length(max=200, message=trans('general_products_services_length', default='Products/Services description too long'))
     ], render_kw={'class': 'form-control'})
+    debt_reminder_frequency = MultiCheckboxField(
+        trans('settings_debt_reminder_frequency', default='Debt Reminder Frequency'),
+        choices=[
+            ('3_days', trans('settings_3_days', default='3 Days')),
+            ('7_days', trans('settings_7_days', default='7 Days')),
+            ('30_days', trans('settings_30_days', default='30 Days')),
+            ('60_days', trans('settings_60_days', default='60 Days')),
+            ('90_days', trans('settings_90_days', default='90 Days'))
+        ],
+        validators=[Optional()],
+        render_kw={'class': 'form-check-input'}
+    )
     submit = SubmitField(trans('general_save_changes', default='Save Changes'), render_kw={'class': 'btn btn-primary w-100'})
 
 def get_role_based_nav():
@@ -98,7 +111,7 @@ def index():
 @requires_role(['trader', 'startup', 'admin'])
 @utils.limiter.limit('10 per minute')
 def profile():
-    """Unified profile management page with KYC status."""
+    """Unified profile management page with KYC status and reminder settings."""
     try:
         db = get_mongo_db()
         user_id = str(current_user.id)
@@ -122,6 +135,8 @@ def profile():
                 form.business_address.data = user_dict['business_details'].get('address', '')
                 form.industry.data = user_dict['business_details'].get('industry', '')
                 form.products_services.data = user_dict['business_details'].get('products_services', '')
+            # Set default reminder frequencies if not already set
+            form.debt_reminder_frequency.data = user_dict.get('settings', {}).get('debt_reminder_frequency', ['3_days', '7_days', '30_days', '60_days', '90_days'])
 
         if form.validate_on_submit():
             try:
@@ -134,12 +149,25 @@ def profile():
                         user=to_dict_user(user),
                         title=trans('settings_profile_title', default='Profile Settings', lang=session.get('lang', 'en'))
                     )
+                # Validate reminder frequencies
+                valid_frequencies = ['3_days', '7_days', '30_days', '60_days', '90_days']
+                selected_frequencies = [sanitize_input(freq, max_length=20) for freq in form.debt_reminder_frequency.data]
+                if any(freq not in valid_frequencies for freq in selected_frequencies):
+                    flash(trans('settings_invalid_reminder_frequency', default='Invalid reminder frequency selected'), 'danger')
+                    return render_template(
+                        'settings/profile.html',
+                        form=form,
+                        user=to_dict_user(user),
+                        title=trans('settings_profile_title', default='Profile Settings', lang=session.get('lang', 'en'))
+                    )
                 update_data = {
                     'display_name': sanitize_input(form.full_name.data, max_length=100),
                     'email': email,
                     'phone': sanitize_input(form.phone.data, max_length=20) if form.phone.data else None,
-                    'setup_complete': True
+                    'setup_complete': True,
+                    'settings': user.settings.copy()  # Preserve existing settings
                 }
+                update_data['settings']['debt_reminder_frequency'] = selected_frequencies
                 if user.role in ['trader', 'startup']:
                     update_data['business_details'] = {
                         'name': sanitize_input(form.business_name.data, max_length=100) if form.business_name.data else '',
@@ -150,7 +178,7 @@ def profile():
                     }
                 if update_user(db, user_id, update_data):
                     logger.info(
-                        f"Profile updated for user {user_id}",
+                        f"Profile updated for user {user_id}, reminder frequencies: {selected_frequencies}",
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
                     )
                     flash(trans('general_profile_updated', default='Profile updated successfully'), 'success')
@@ -271,19 +299,26 @@ def upload_profile_picture():
 
         # Store new profile picture
         file_id = fs.put(file_content, filename=sanitize_input(file.filename, max_length=100), content_type=file.content_type)
-        update_user(db, user_id, {
+        update_data = {
             'profile_picture': str(file_id),
             'updated_at': datetime.now(timezone.utc)
-        })
-        logger.info(
-            f"Profile picture uploaded for user {user_id}, file_id: {file_id}",
-            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-        )
-        return jsonify({
-            "success": True,
-            "message": trans('settings_profile_picture_updated', default='Profile picture updated successfully.'),
-            "image_url": url_for('settings.get_profile_picture', user_id=user_id)
-        })
+        }
+        if update_user(db, user_id, update_data):
+            logger.info(
+                f"Profile picture uploaded for user {user_id}, file_id: {file_id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            return jsonify({
+                "success": True,
+                "message": trans('settings_profile_picture_updated', default='Profile picture updated successfully.'),
+                "image_url": url_for('settings.get_profile_picture', user_id=user_id)
+            })
+        else:
+            logger.error(
+                f"Failed to update profile picture for user {user_id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            return jsonify({"success": False, "message": trans('general_something_went_wrong', default='An error occurred.')}), 500
     except CSRFError as e:
         logger.error(
             f"CSRF error in profile picture upload for user {user_id}: {str(e)}",
