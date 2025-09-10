@@ -537,16 +537,10 @@ def create_app():
         breadcrumb_items = []
 
         if current_user.is_authenticated:
-            role = getattr(current_user, 'role', None)
+            role = getattr(current_user, 'role', 'trader')
             if role == 'admin':
                 nav = build_nav(ADMIN_NAV)
                 tools = build_nav(ADMIN_TOOLS)
-            elif role == 'startup':
-                nav = build_nav(STARTUP_NAV)
-                tools = build_nav(STARTUP_TOOLS)
-            elif role == 'trader':
-                nav = build_nav(TRADER_NAV)
-                tools = build_nav(TRADER_TOOLS)
             else:
                 nav = build_nav(TRADER_NAV)
                 tools = build_nav(TRADER_TOOLS)
