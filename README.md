@@ -6,7 +6,7 @@ Ficore Labs (DIICE) is a modern, modular, and habit-forming business management 
 ---
 
 ## Features
-- **Smart Reminders**: Daily log reminders, streak tracking, and engagement banners.
+- **Smart Reminders**: Daily log reminders, Customizable Debt aging reminders, rewarding streak tracking (upto 30% discount on 100 days streak), and engagement banners.
 - **Quick Log Buttons**: Fast entry for sales, expenses, and inventory.
 - **Visual Progress & Charts**: Dashboard with profit/loss, streaks, and financial health charts (Chart.js).
 - **Streaks & Gamification**: Track daily usage streaks and reward consistency.
@@ -85,3 +85,4 @@ This account is auto-created for management purposes (user monitoring, KYC, subs
 
 ## License
 MIT (c) Ficore Labs, 2025
+
