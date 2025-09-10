@@ -41,6 +41,74 @@ class DebtorForm(FlaskForm):
 
 debtors_bp = Blueprint('debtors', __name__, url_prefix='/debtors')
 
+# Define default aging thresholds (in days)
+DEFAULT_AGING_THRESHOLDS = {
+    '3_days': 3,
+    '7_days': 7,
+    '30_days': 30,
+    '60_days': 60,
+    '90_days': 90
+}
+
+def calculate_debt_age(debtor):
+    """Calculate the age of a debt in days."""
+    created_at = debtor.get('created_at')
+    if not created_at:
+        return 0
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=ZoneInfo("UTC"))
+    now = datetime.now(timezone.utc)
+    age = (now - created_at).days
+    return age
+
+def get_user_reminder_frequency(user_id):
+    """Get the user's reminder frequency setting."""
+    db = utils.get_mongo_db()
+    user = db.users.find_one({'_id': ObjectId(user_id)})
+    if user and 'settings' in user and 'debt_reminder_frequency' in user['settings']:
+        return user['settings']['debt_reminder_frequency']
+    return list(DEFAULT_AGING_THRESHOLDS.keys())  # Default to all thresholds
+
+def generate_debt_notifications(user_id):
+    """Generate notifications for overdue debts based on user-defined frequency."""
+    db = utils.get_mongo_db()
+    query = {'user_id': str(user_id), 'type': 'debtor'}
+    debtors = list(db.records.find(query))
+    notifications = []
+    reminder_frequencies = get_user_reminder_frequency(user_id)
+
+    for debtor in debtors:
+        age = calculate_debt_age(debtor)
+        last_reminder = debtor.get('last_reminder_sent')
+        if last_reminder and last_reminder.tzinfo is None:
+            last_reminder = last_reminder.replace(tzinfo=ZoneInfo("UTC"))
+
+        # Check if debt is overdue based on user-selected frequencies
+        for freq in reminder_frequencies:
+            threshold_days = DEFAULT_AGING_THRESHOLDS.get(freq, 30)
+            if age >= threshold_days:
+                # Avoid sending reminders too frequently (e.g., once every 3 days)
+                if not last_reminder or (datetime.now(timezone.utc) - last_reminder) >= timedelta(days=3):
+                    message = f"Debt of {utils.format_currency(debtor['amount_owed'])} to {debtor['name']} is {freq.replace('_', ' ')} overdue."
+                    notification = {
+                        'user_id': str(user_id),
+                        'debt_id': str(debtor['_id']),
+                        'message': message,
+                        'type': 'debt_overdue',
+                        'timestamp': datetime.now(timezone.utc),
+                        'read': False
+                    }
+                    notifications.append(notification)
+                    # Update debtor with last reminder sent
+                    db.records.update_one(
+                        {'_id': debtor['_id']},
+                        {'$set': {'last_reminder_sent': datetime.now(timezone.utc), 'reminder_count': debtor.get('reminder_count', 0) + 1}}
+                    )
+    
+    if notifications:
+        db.notifications.insert_many(notifications)
+    return notifications
+
 @debtors_bp.route('/')
 @login_required
 @utils.requires_role(['trader', 'startup', 'admin'])
@@ -51,12 +119,18 @@ def index():
         query = {'user_id': str(current_user.id), 'type': 'debtor'}
         debtors = list(db.records.find(query).sort('created_at', -1))
         
-        # Convert naive datetimes to timezone-aware
+        # Convert naive datetimes to timezone-aware and calculate aging
         for debtor in debtors:
             if debtor.get('created_at') and debtor['created_at'].tzinfo is None:
                 debtor['created_at'] = debtor['created_at'].replace(tzinfo=ZoneInfo("UTC"))
             if debtor.get('reminder_date') and debtor['reminder_date'].tzinfo is None:
                 debtor['reminder_date'] = debtor['reminder_date'].replace(tzinfo=ZoneInfo("UTC"))
+            if debtor.get('last_reminder_sent') and debtor['last_reminder_sent'].tzinfo is None:
+                debtor['last_reminder_sent'] = debtor['last_reminder_sent'].replace(tzinfo=ZoneInfo("UTC"))
+            debtor['age_days'] = calculate_debt_age(debtor)
+        
+        # Generate notifications for overdue debts
+        generate_debt_notifications(current_user.id)
         
         can_interact = utils.can_user_interact(current_user)
         if not can_interact:
@@ -575,3 +649,32 @@ def delete(id):
         logger.error(f"Error deleting debtor {id} for user {current_user.id}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('debtors_delete_error', default='An error occurred'), 'danger')
     return redirect(url_for('debtors.index'))
+
+@debtors_bp.route('/notifications/count')
+@login_required
+@utils.requires_role(['trader', 'startup', 'admin'])
+def notification_count():
+    """Return the count of unread notifications."""
+    try:
+        db = utils.get_mongo_db()
+        count = db.notifications.count_documents({'user_id': str(current_user.id), 'read': False})
+        return jsonify({'count': count})
+    except Exception as e:
+        logger.error(f"Error fetching notification count for user {current_user.id}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        return jsonify({'error': trans('debtors_notification_count_error', default='Failed to fetch notification count')}), 500
+
+@debtors_bp.route('/notifications')
+@login_required
+@utils.requires_role(['trader', 'startup', 'admin'])
+def notifications():
+    """Return a list of notifications for the user."""
+    try:
+        db = utils.get_mongo_db()
+        notifications = list(db.notifications.find({'user_id': str(current_user.id)}).sort('timestamp', -1).limit(10))
+        for notification in notifications:
+            notification['_id'] = str(notification['_id'])
+            notification['timestamp'] = notification['timestamp'].isoformat()
+        return jsonify(notifications)
+    except Exception as e:
+        logger.error(f"Error fetching notifications for user {current_user.id}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        return jsonify({'error': trans('debtors_notification_fetch_error', default='Failed to fetch notifications')}), 500
