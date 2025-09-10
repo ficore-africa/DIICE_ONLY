@@ -379,9 +379,6 @@ def create_app():
     from blueprints.general.routes import general_bp
     from notifications.routes import notifications
     from blueprints.business.routes import business
-    from blueprints.funds.routes import funds_bp
-    from blueprints.forecasts.routes import forecasts_bp
-    from blueprints.investor_reports.routes import investor_reports_bp
     from blueprints.subscribe.routes import subscribe_bp
     from blueprints.kyc.routes import kyc_bp
     from blueprints.settings.routes import settings_bp
@@ -394,9 +391,6 @@ def create_app():
     app.register_blueprint(receipts_bp, url_prefix='/receipts')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(admin_bp, url_prefix='/admin')
-    app.register_blueprint(funds_bp, url_prefix='/funds')
-    app.register_blueprint(forecasts_bp, url_prefix='/forecasts')
-    app.register_blueprint(investor_reports_bp, url_prefix='/investor-reports')
     app.register_blueprint(subscribe_bp, url_prefix='/subscribe')
     app.register_blueprint(general_bp, url_prefix='/general')
     app.register_blueprint(business, url_prefix='/business')
