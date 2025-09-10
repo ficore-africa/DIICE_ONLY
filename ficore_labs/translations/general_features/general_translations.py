@@ -23,7 +23,7 @@ GENERAL_TRANSLATIONS = {
         'rewards_tip4': 'Missing a day will reset your streak, so stay consistent!',
         'general_identifier_length': 'Username or Email must be at least 4 characters',
         'general_user_profile': 'User Profile',
-        'general_hi_user': 'Hi, User',
+        'general_hi_user': 'Hi,',
         'general_language_english': 'English',
         'general_language_hausa': 'Hausa',
         'general_about_business_finance': 'Learn More About Us',
