@@ -1,0 +1,115 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+
+{% block title %}
+{{ trans('rewards_title', default='Rewards') | escape }}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-primary mb-4">
+        <i class="bi bi-trophy me-2"></i>
+        {{ trans('rewards_title', default='Rewards') | escape }}
+    </h1>
+
+    <!-- Rewards Overview -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3>{{ trans('rewards_your_progress', default='Your Rewards Progress') | escape }}</h3>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="alert alert-success d-flex align-items-center" role="alert">
+                        <i class="bi bi-fire me-2"></i>
+                        <div>
+                            {{ trans('rewards_streak', default='Current Streak:') | escape }}
+                            <strong>{{ streak }}</strong> {{ trans('rewards_days', default='days') | escape }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                        <i class="bi bi-coin me-2"></i>
+                        <div>
+                            {{ trans('rewards_points', default='Points:') | escape }}
+                            <strong>{{ points }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if can_redeem %}
+            <form method="POST" action="{{ url_for('rewards.redeem') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary">
+                    {{ trans('rewards_redeem', default='Redeem 100 Points for 30% Discount') | escape }}
+                </button>
+            </form>
+            {% elif discount_applied %}
+            <div class="alert alert-success">
+                {{ trans('rewards_discount_applied', default='You have a 30% discount applied to your next subscription!') | escape }}
+            </div>
+            {% else %}
+            <p class="text-muted">{{ trans('rewards_points_needed', default='You need 100 points to redeem a 30% discount on your next subscription.') | escape }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tips Section -->
+    <div class="card">
+        <div class="card-body">
+            <h3>{{ trans('rewards_tips_title', default='How to Earn Rewards') | escape }}</h3>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item">
+                    {{ trans('rewards_tip1', default='Log any transaction (debtor, creditor, receipt, payment, or fund) daily to maintain your streak.') | escape }}
+                </li>
+                <li class="list-group-item">
+                    {{ trans('rewards_tip2', default='Each day with a transaction earns 1 point.') | escape }}
+                </li>
+                <li class="list-group-item">
+                    {{ trans('rewards_tip3', default='Reach 100 points to redeem a 30% discount on your next subscription.') | escape }}
+                </li>
+                <li class="list-group-item">
+                    {{ trans('rewards_tip4', default='Missing a day will reset your streak, so stay consistent!') | escape }}
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
