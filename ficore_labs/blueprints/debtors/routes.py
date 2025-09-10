@@ -17,6 +17,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from helpers.branding_helpers import draw_ficore_pdf_header, ficore_csv_header
 import csv
+from models import get_user  # Added import for get_user
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +63,11 @@ def calculate_debt_age(debtor):
     return age
 
 def get_user_reminder_frequency(user_id):
-    """Get the user's reminder frequency setting."""
+    """Get the user's reminder frequency setting from the users collection."""
     db = utils.get_mongo_db()
-    user = db.users.find_one({'_id': ObjectId(user_id)})
-    if user and 'settings' in user and 'debt_reminder_frequency' in user['settings']:
-        return user['settings']['debt_reminder_frequency']
+    user = get_user(db, str(user_id))  # Use get_user from models
+    if user and hasattr(user, 'settings') and 'debt_reminder_frequency' in user.settings:
+        return user.settings['debt_reminder_frequency']
     return list(DEFAULT_AGING_THRESHOLDS.keys())  # Default to all thresholds
 
 def generate_debt_notifications(user_id):
@@ -76,6 +77,7 @@ def generate_debt_notifications(user_id):
     debtors = list(db.records.find(query))
     notifications = []
     reminder_frequencies = get_user_reminder_frequency(user_id)
+    selected_thresholds = [DEFAULT_AGING_THRESHOLDS[freq] for freq in reminder_frequencies if freq in DEFAULT_AGING_THRESHOLDS]
 
     for debtor in debtors:
         age = calculate_debt_age(debtor)
@@ -83,10 +85,9 @@ def generate_debt_notifications(user_id):
         if last_reminder and last_reminder.tzinfo is None:
             last_reminder = last_reminder.replace(tzinfo=ZoneInfo("UTC"))
 
-        # Check if debt is overdue based on user-selected frequencies
-        for freq in reminder_frequencies:
-            threshold_days = DEFAULT_AGING_THRESHOLDS.get(freq, 30)
-            if age >= threshold_days:
+        # Check if debt age matches any user-selected frequency threshold
+        for threshold_days, freq in [(DEFAULT_AGING_THRESHOLDS[f], f) for f in reminder_frequencies if f in DEFAULT_AGING_THRESHOLDS]:
+            if age >= threshold_days and age <= threshold_days + 1:  # Allow a 1-day window
                 # Avoid sending reminders too frequently (e.g., once every 3 days)
                 if not last_reminder or (datetime.now(timezone.utc) - last_reminder) >= timedelta(days=3):
                     message = f"Debt of {utils.format_currency(debtor['amount_owed'])} to {debtor['name']} is {freq.replace('_', ' ')} overdue."
@@ -104,9 +105,13 @@ def generate_debt_notifications(user_id):
                         {'_id': debtor['_id']},
                         {'$set': {'last_reminder_sent': datetime.now(timezone.utc), 'reminder_count': debtor.get('reminder_count', 0) + 1}}
                     )
-    
+
     if notifications:
         db.notifications.insert_many(notifications)
+        logger.info(
+            f"Generated {len(notifications)} debt notifications for user {user_id}",
+            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': user_id}
+        )
     return notifications
 
 @debtors_bp.route('/')
