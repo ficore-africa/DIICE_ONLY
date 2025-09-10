@@ -259,6 +259,16 @@
         </div>
     </div>
 
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="appToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">{{ t('general_notification', default='Notification') | e }}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t('general_close', default='Close') | e }}"></button>
+            </div>
+            <div class="toast-body"></div>
+        </div>
+    </div>
+
     <style>
         .profile-link-container {
             display: flex;
@@ -319,6 +329,7 @@
         .toast-info { background-color: #17a2b8; }
         .toast-error { background-color: #dc3545; }
         .toast-success { background-color: #28a745; }
+        .toast-warning { background-color: #ffc107; }
         .language-buttons.d-flex {
             flex-direction: row;
             gap: 5px;
@@ -394,11 +405,12 @@
         }
 
         function showToast(message, type = "info") {
-            const toast = document.createElement("div");
-            toast.className = `toast toast-${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
+            const toast = document.getElementById('appToast');
+            const toastBody = toast.querySelector('.toast-body');
+            toastBody.textContent = message;
+            toast.className = `toast bg-${type} text-white`;
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
         }
 
         // Flag to prevent rendering authenticated content after 401/403
@@ -486,10 +498,10 @@
                     });
                     window.location.reload(); // Ensures all translations update
                 } else {
-                    showToast('Language update failed', 'error');
+                    showToast('{{ t("general_language_update_failed", default="Language update failed") | e }}', 'error');
                 }
             } catch (error) {
-                showToast('Could not change language', 'error');
+                showToast('{{ t("general_language_update_error", default="Could not change language") | e }}', 'error');
                 console.error('Language toggle error:', error);
             }
         }
@@ -573,6 +585,10 @@
             {% if current_user.is_authenticated %}
                 if (!window.isAuthenticatedContentBlocked) {
                     loadNotificationCount();
+                    // Poll for new notifications every 30 seconds
+                    setInterval(loadNotificationCount, 30000);
+                    // Show unread notifications as toasts
+                    loadNotificationsForToasts();
                 }
             {% endif %}
 
@@ -639,9 +655,7 @@
         async function loadNotificationCount() {
             if (window.isAuthenticatedContentBlocked) return;
             try {
-                const endpoint = '{{ url_for("notifications.count") | e }}';
-                if (!endpoint) return;
-                const response = await fetch(endpoint, {
+                const response = await fetch('{{ url_for("debtors.notifications_count") | e }}', {
                     headers: {
                         'X-CSRFToken': getCsrfToken()
                     }
@@ -667,24 +681,7 @@
                 return;
             }
             try {
-                const endpoint = '{{ url_for("notifications.count") | e }}';
-                if (!endpoint) {
-                    body.innerHTML = `
-                        <div class="notification-card">
-                            <div class="notification-item">
-                                <div class="notification-icon">
-                                    <i class="bi bi-info-circle text-muted"></i>
-                                </div>
-                                <div class="notification-content">
-                                    <div class="notification-description fw-semibold">{{ t('general_no_notifications', default='No notifications') | e }}</div>
-                                    <div class="notification-time text-muted">{{ t('general_check_back_later', default='Check back later') | e }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    return;
-                }
-                const response = await fetch(endpoint, {
+                const response = await fetch('{{ url_for("debtors.notifications") | e }}', {
                     headers: {
                         'X-CSRFToken': getCsrfToken()
                     }
@@ -723,6 +720,8 @@
                             </div>
                         </div>
                     `).join('');
+                    // Mark notifications as read after displaying
+                    markNotificationsAsRead(data);
                 }
             } catch (error) {
                 body.innerHTML = `
@@ -742,8 +741,49 @@
             }
         }
 
+        async function loadNotificationsForToasts() {
+            if (window.isAuthenticatedContentBlocked) return;
+            try {
+                const response = await fetch('{{ url_for("debtors.notifications") | e }}', {
+                    headers: {
+                        'X-CSRFToken': getCsrfToken()
+                    }
+                });
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                if (data.error) return;
+                data.forEach(notification => {
+                    if (!notification.read && notification.type === 'debt_overdue') {
+                        showToast(notification.message, 'warning');
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load notifications for toasts:', error);
+            }
+        }
+
+        async function markNotificationsAsRead(notifications) {
+            if (window.isAuthenticatedContentBlocked) return;
+            try {
+                const unreadIds = notifications.filter(n => !n.read).map(n => n._id);
+                if (unreadIds.length === 0) return;
+                await fetch('{{ url_for("debtors.notifications") | e }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ action: 'mark_read', notification_ids: unreadIds })
+                });
+                loadNotificationCount(); // Update badge after marking as read
+            } catch (error) {
+                console.error('Failed to mark notifications as read:', error);
+            }
+        }
+
         function getNotificationIcon(type) {
             const icons = {
+                'debt_overdue': 'bi-exclamation-triangle',
                 'email': 'bi-envelope',
                 'sms': 'bi-chat',
                 'whatsapp': 'bi-whatsapp',
@@ -761,8 +801,8 @@
                 minutes_ago: '{{ t("general_minutes_ago", default="m ago") | e }}',
                 hours_ago: '{{ t("general_hours_ago", default="h ago") | e }}',
                 days_ago: '{{ t("general_days_ago", default="d ago") | e }}',
-                no_notifications: '{{ t("no_notifications", default="No notifications") | e }}',
-                check_back_later: '{{ t("check_back_later", default="Check back later") | e }}'
+                no_notifications: '{{ t("general_no_notifications", default="No notifications") | e }}',
+                check_back_later: '{{ t("general_check_back_later", default="Check back later") | e }}'
             };
             const now = new Date();
             const time = new Date(timestamp);
