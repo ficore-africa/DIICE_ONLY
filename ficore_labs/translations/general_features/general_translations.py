@@ -722,6 +722,13 @@ GENERAL_TRANSLATIONS = {
         'settings_about_ficore': 'About FiCore',
         'settings_failed_to_update_setting': 'Failed to update setting',
         'settings_profile_title': 'Profile Settings',
+        'settings_debt_reminder_frequency': 'Debt Reminder Frequency',
+        'settings_3_days': '3 Days',
+        'settings_7_days': '7 Days',
+        'settings_30_days': '30 Days',
+        'settings_60_days': '60 Days',
+        'settings_90_days': '90 Days',
+        'settings_invalid_reminder_frequency': 'Invalid reminder frequency selected',
 
         # Dashboard & Reports
         'dashboard_title': 'Dashboard',
@@ -1267,6 +1274,13 @@ GENERAL_TRANSLATIONS = {
         'settings_about_ficore': 'Game da FiCore',
         'settings_failed_to_update_setting': 'Kasa sabunta saiti',
         'settings_profile_title': 'Saitin Bayananka',
+        'settings_debt_reminder_frequency': 'Mitar Tunatar da Bashi',
+        'settings_3_days': 'Kwana 3',
+        'settings_7_days': 'Kwana 7',
+        'settings_30_days': 'Kwana 30',
+        'settings_60_days': 'Kwana 60',
+        'settings_90_days': 'Kwana 90',
+        'settings_invalid_reminder_frequency': 'An zaɓi mitar tunatarwa mara inganci',
 
         # Dashboard & Reports
         'dashboard_title': 'Dashboard',
