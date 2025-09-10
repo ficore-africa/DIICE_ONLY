@@ -8,9 +8,9 @@ from utils import requires_role, is_valid_email, format_currency, get_mongo_db, 
 from models import User, get_user, update_user, create_kyc_record, update_kyc_record, get_kyc_record, to_dict_kyc_record, to_dict_user, get_user_by_email
 from bson import ObjectId
 from datetime import datetime, timezone
-from wtforms import StringField, TextAreaField, SubmitField, FileField
-from wtforms.fields import MultiCheckboxField
+from wtforms import StringField, TextAreaField, SubmitField, FileField, SelectMultipleField
 from wtforms.validators import DataRequired, Length, Email, Optional
+from wtforms.widgets import ListWidget, CheckboxInput
 from gridfs import GridFS
 from io import BytesIO
 from PIL import Image
@@ -50,7 +50,7 @@ class ProfileForm(FlaskForm):
         Optional(),
         Length(max=200, message=trans('general_products_services_length', default='Products/Services description too long'))
     ], render_kw={'class': 'form-control'})
-    debt_reminder_frequency = MultiCheckboxField(
+    debt_reminder_frequency = SelectMultipleField(
         trans('settings_debt_reminder_frequency', default='Debt Reminder Frequency'),
         choices=[
             ('3_days', trans('settings_3_days', default='3 Days')),
@@ -60,6 +60,8 @@ class ProfileForm(FlaskForm):
             ('90_days', trans('settings_90_days', default='90 Days'))
         ],
         validators=[Optional()],
+        widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),
         render_kw={'class': 'form-check-input'}
     )
     submit = SubmitField(trans('general_save_changes', default='Save Changes'), render_kw={'class': 'btn btn-primary w-100'})
