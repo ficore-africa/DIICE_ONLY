@@ -655,7 +655,7 @@
         async function loadNotificationCount() {
             if (window.isAuthenticatedContentBlocked) return;
             try {
-                const response = await fetch('{{ url_for("debtors.notifications_count") | e }}', {
+                const response = await fetch('{{ url_for("debtors.notification_count") | e }}', {
                     headers: {
                         'X-CSRFToken': getCsrfToken()
                     }
