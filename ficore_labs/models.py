@@ -135,7 +135,8 @@ def migrate_naive_datetimes():
             'sessions': ['created_at', 'expires_at'],  # Assuming sessions collection exists
             'tool_usage': ['timestamp'],  # Assuming tool_usage collection exists
             'reminder_logs': ['timestamp'],  # Assuming reminder_logs collection exists
-            'waitlist': ['created_at', 'updated_at']  # Added for waitlist collection
+            'waitlist': ['created_at', 'updated_at'],  # Added for waitlist collection
+            'rewards': ['created_at', 'expires_at']  # Added for rewards collection
         }
 
         for collection_name, datetime_fields in datetime_fields_by_collection.items():
@@ -191,6 +192,7 @@ def initialize_app_data(app):
     Initialize MongoDB collections, indexes, and perform one-off migrations for business finance modules.
     Creates a default admin account if it doesn't exist, ensuring password is hashed.
     Adds a sample investor_report record if none exist to support the new feature.
+    Adds a sample reward record if none exist to support the new rewards feature.
     
     Args:
         app: Flask application instance
@@ -536,6 +538,31 @@ def initialize_app_data(app):
                         {'key': [('status', ASCENDING)]},
                         {'key': [('uploaded_at', DESCENDING)]}
                     ]
+                },
+                'rewards': {
+                    'validator': {
+                        '$jsonSchema': {
+                            'bsonType': 'object',
+                            'required': ['user_id', 'type', 'points', 'status', 'created_at'],
+                            'properties': {
+                                '_id': {'bsonType': 'objectId'},
+                                'user_id': {'bsonType': 'string'},
+                                'type': {'enum': ['referral', 'milestone', 'promotion', 'loyalty']},
+                                'points': {'bsonType': 'int', 'minimum': 0},
+                                'status': {'enum': ['pending', 'awarded', 'redeemed', 'expired']},
+                                'description': {'bsonType': ['string', 'null']},
+                                'created_at': {'bsonType': 'date'},
+                                'expires_at': {'bsonType': ['date', 'null']},
+                                'redeemed_at': {'bsonType': ['date', 'null']}
+                            }
+                        }
+                    },
+                    'indexes': [
+                        {'key': [('user_id', ASCENDING), ('type', ASCENDING)]},
+                        {'key': [('status', ASCENDING)]},
+                        {'key': [('created_at', DESCENDING)]},
+                        {'key': [('expires_at', ASCENDING)], 'expireAfterSeconds': 31536000}  # 1 year expiration
+                    ]
                 }
             }
                 
@@ -592,6 +619,28 @@ def initialize_app_data(app):
                                    extra={'session_id': 'no-session-id'})
                     except Exception as e:
                         logger.error(f"Failed to create sample investor report: {str(e)}", 
+                                    exc_info=True, extra={'session_id': 'no-session-id'})
+                        raise
+            
+            # Add sample reward record if none exist
+            if 'rewards' in collections:
+                reward_exists = db_instance.rewards.find_one({'type': 'referral'})
+                if not reward_exists:
+                    sample_reward = {
+                        'user_id': 'admin',
+                        'type': 'referral',
+                        'points': 100,
+                        'status': 'pending',
+                        'description': 'Sample referral reward for testing purposes.',
+                        'created_at': datetime.now(timezone.utc),
+                        'expires_at': datetime.now(timezone.utc) + timedelta(days=365)
+                    }
+                    try:
+                        result = db_instance.rewards.insert_one(sample_reward)
+                        logger.info(f"Created sample reward with ID: {result.inserted_id}", 
+                                   extra={'session_id': 'no-session-id'})
+                    except Exception as e:
+                        logger.error(f"Failed to create sample reward: {str(e)}", 
                                     exc_info=True, extra={'session_id': 'no-session-id'})
                         raise
             
@@ -1261,7 +1310,6 @@ def to_dict_user(user):
         'subscription_end': user.subscription_end,
         'profile_picture': user.profile_picture,
         'phone': user.phone,
-        'coin_balance': user.coin_balance,
         'dark_mode': user.dark_mode,
         'settings': user.settings,
         'security_settings': user.security_settings
