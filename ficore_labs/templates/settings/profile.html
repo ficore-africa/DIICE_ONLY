@@ -126,6 +126,16 @@
                     </div>
                     {% endif %}
 
+                    <div class="profile-form-group">
+                        <label for="debt_reminder_frequency" class="profile-form-label">{{ t('settings_debt_reminder_frequency', default='Debt Reminder Frequency') }}</label>
+                        {{ form.debt_reminder_frequency(class='profile-form-check') }}
+                        {% if form.debt_reminder_frequency.errors %}
+                            {% for error in form.debt_reminder_frequency.errors %}
+                                <p class="profile-text-danger">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
                     <div class="profile-text-center">
                         {{ form.submit(class='profile-btn profile-btn-primary') }}
                     </div>
