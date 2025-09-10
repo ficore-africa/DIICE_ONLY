@@ -384,6 +384,7 @@ def create_app():
     from blueprints.kyc.routes import kyc_bp
     from blueprints.settings.routes import settings_bp
     from blueprints.inventory.routes import inventory_bp
+    from blueprints.rewards.routes import rewards_bp
 
     app.register_blueprint(users_bp, url_prefix='/users')
     app.register_blueprint(debtors_bp, url_prefix='/debtors')
@@ -400,7 +401,8 @@ def create_app():
     app.register_blueprint(kyc_bp, url_prefix='/kyc')
     app.register_blueprint(settings_bp, url_prefix='/settings')
     app.register_blueprint(inventory_bp, url_prefix='/inventory')
-    logger.info('Registered all blueprints including KYC and Settings', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+    app.register_blueprint(rewards_bp, url_prefix='/rewards')
+    logger.info('Registered all blueprints including KYC, Settings, and Rewards', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
 
     # Define format_currency filter
     def format_currency(value):
