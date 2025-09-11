@@ -103,54 +103,6 @@
         </a>
     </div>
 
-    <!-- Weekly Profit Chart -->
-    <div class="mb-5">
-        <h3 class="text-primary">
-            <i class="bi bi-graph-up-arrow me-2"></i>
-            {{ trans('weekly_profit_chart', default='Weekly Profit Trend') | escape }}
-        </h3>
-        <canvas id="weeklyProfitChart" height="100"></canvas>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    const profitLabel = "{{ trans('profit', default='Profit') | escape }}";
-    document.addEventListener('DOMContentLoaded', function() {
-        fetch("{{ url_for('dashboard.weekly_profit_data') }}")
-            .then(response => response.json())
-            .then(result => {
-                const data = result.data;
-                const labels = data.map(d => d.date);
-                const profits = data.map(d => d.profit);
-                const ctx = document.getElementById('weeklyProfitChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: profitLabel,
-                            data: profits,
-                            borderColor: '#0F3D57',
-                            backgroundColor: 'rgba(15,61,87,0.1)',
-                            fill: true,
-                            tension: 0.3
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { display: false },
-                            title: { display: false }
-                        },
-                        scales: {
-                            y: { beginAtZero: true }
-                        }
-                    }
-                });
-            });
-    });
-    </script>
-
     <!-- Business Finance Stats -->
     {% if current_user.is_authenticated %}
     <div class="row g-3 mb-4">
