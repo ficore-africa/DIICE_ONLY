@@ -32,7 +32,7 @@
     <!-- Tax Prep Mode Toggle -->
     <div class="mb-4">
         <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="taxPrepToggle">
+            <input class="form-check-input" type="checkbox" id="taxPrepToggle" {% if tax_prep_mode %}checked{% endif %}>
             <label class="form-check-label" for="taxPrepToggle">
                 <i class="bi bi-calculator me-1"></i>
                 {{ trans('tax_prep_mode', default='Tax Prep Mode: Show Profit Only') | escape }}
@@ -114,8 +114,8 @@
                     </div>
                     <h6 class="card-title">{{ trans('inventory_nav_label', default='Inventory') | escape }}</h6>
                     <p class="card-text">
-                        <span class="h5 text-primary">{{ stats.total_inventory if stats.total_inventory is defined else '?' }}</span><br>
-                        <small class="text-muted">{{ trans('inventory_dashboard_desc', default='Manage your stock') | escape }}</small>
+                        <span class="h5 text-primary">{{ stats.total_inventory | default('?') }}</span><br>
+                        <small class="text-muted">{{ stats.total_inventory_cost | format_currency }}</small>
                     </p>
                     <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
                 </div>
@@ -184,22 +184,23 @@
     </div>
 
     <!-- Reminder Log -->
-    <div>
+    {% if show_daily_log_reminder %}
+    <div class="mb-4">
         {{ trans('reminder_log_today', default="Have you recorded today’s sales or expenses? Keep your records up to date!") | escape }}
         <a href="{{ url_for('business.home') }}" class="btn btn-sm btn-primary ms-2">{{ trans('log_now', default='Log Now') | escape }}</a>
     </div>
+    {% endif %}
 
     <!-- Quick Actions -->
     {% if can_interact %}
     <div class="mb-4">
         <h3>{{ trans('general_quick_actions', default='Quick Actions') | escape }}</h3>
         <div class="d-flex flex-wrap gap-2">
-            <!-- Trader-specific actions -->
+            <a href="{{ url_for('inventory.add') }}" class="btn btn-primary">{{ trans('inventory_add', default='Add Inventory Item') | escape }}</a>
             <a href="{{ url_for('creditors.add') }}" class="btn btn-primary">{{ trans('creditors_create_what_you_owe', default='Create What You Owe') | escape }}</a>
             <a href="{{ url_for('debtors.add') }}" class="btn btn-primary">{{ trans('debtors_create_what_they_owe_you', default='Create What They Owe You') | escape }}</a>
             <a href="{{ url_for('payments.add') }}" class="btn btn-primary">{{ trans('payments_add_money_out', default='Add Money Out') | escape }}</a>
             <a href="{{ url_for('receipts.add') }}" class="btn btn-primary">{{ trans('receipts_add_money_in', default='Add Money In') | escape }}</a>
-            <!-- Admin-specific action -->
             {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('admin.dashboard') }}" class="btn btn-warning">{{ trans('admin_dashboard', default='Admin Dashboard') | escape }}</a>
             {% endif %}
@@ -209,6 +210,54 @@
 
     <!-- Business Finance Data -->
     <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h3>{{ trans('inventory_nav_label', default='Inventory') | escape }}</h3>
+                    <small class="text-muted">{{ trans('inventory_dashboard_desc', default='Manage your stock') | escape }}</small>
+                    {% if recent_inventory %}
+                        <table class="table table-striped mt-3">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                    <th>{{ trans('inventory_cost', default='Cost') | escape }}</th>
+                                    <th>{{ trans('inventory_expected_margin', default='Expected Margin') | escape }}</th>
+                                    {% if can_interact %}
+                                    <th>{{ trans('general_actions', default='Actions') | escape }}</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recent_inventory %}
+                                    <tr>
+                                        <td>{{ item.name | escape }}</td>
+                                        <td>{{ item.cost | format_currency }}</td>
+                                        <td>{{ item.expected_margin | format_percentage }}</td>
+                                        {% if can_interact %}
+                                        <td>
+                                            <button class="btn btn-secondary btn-sm actions-btn"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#inventoryActionsModal"
+                                                    data-id="{{ item._id }}"
+                                                    data-name="{{ item.name }}"
+                                                    data-cost="{{ item.cost }}"
+                                                    data-expected-margin="{{ item.expected_margin }}"
+                                                    data-date="{{ item.created_at | format_date }}">
+                                                {{ trans('general_actions', default='Actions') | escape }}
+                                            </button>
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>{{ trans('inventory_no_items', default='No inventory items recorded yet.') | escape }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -404,6 +453,43 @@
     </div>
     {% endif %}
 
+    <!-- Inventory Actions Modal -->
+    <div class="modal fade" id="inventoryActionsModal" tabindex="-1" aria-labelledby="inventoryActionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="inventoryActionsModalLabel">{{ trans('inventory_nav_label', default='Inventory') | escape }}</h5>
+                    <button class="btn-close" data-bs-dismiss="modal" aria-label="{{ trans('general_close', default='Close') | escape }}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>{{ trans('general_name', default='Name') | escape }}:</strong> <span id="inventoryModalName"></span></p>
+                            <p><strong>{{ trans('inventory_cost', default='Cost') | escape }}:</strong> <span id="inventoryModalCost"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>{{ trans('inventory_expected_margin', default='Expected Margin') | escape }}:</strong> <span id="inventoryModalExpectedMargin"></span></p>
+                            <p><strong>{{ trans('general_date', default='Date') | escape }}:</strong> <span id="inventoryModalDate"></span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a id="inventoryViewBtn" class="btn btn-info" href="#">{{ trans('general_view', default='View') | escape }}</a>
+                    {% if can_interact %}
+                    <a id="inventoryEditBtn" class="btn btn-primary" href="#">{{ trans('general_edit', default='Edit') | escape }}</a>
+                    <form id="inventoryDeleteForm" action="#" method="POST" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('{{ trans('general_confirm_delete', default='Are you sure?') | escape | replace('\'', '&#39;') }}')">
+                            {{ trans('general_delete', default='Delete') | escape }}
+                        </button>
+                    </form>
+                    {% endif %}
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('general_close', default='Close') | escape }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Creditor Actions Modal -->
     <div class="modal fade" id="creditorActionsModal" tabindex="-1" aria-labelledby="creditorActionsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -561,6 +647,13 @@
     document.addEventListener('DOMContentLoaded', function () {
         const modals = [
             {
+                id: 'inventoryActionsModal',
+                fields: ['Name', 'Cost', 'ExpectedMargin', 'Date'],
+                viewBtnId: 'inventoryViewBtn',
+                editBtnId: 'inventoryEditBtn',
+                deleteFormId: 'inventoryDeleteForm'
+            },
+            {
                 id: 'creditorActionsModal',
                 fields: ['Name', 'Amount', 'Contact', 'Description', 'Date'],
                 viewBtnId: 'creditorViewBtn',
@@ -596,15 +689,17 @@
                 const button = event.relatedTarget;
                 const id = button.getAttribute('data-id');
                 modal.fields.forEach(field => {
+                    const fieldKey = field.toLowerCase().replace('expectedmargin', 'expected-margin');
                     const element = document.getElementById(`${modal.id.replace('ActionsModal', 'Modal')}${field}`);
                     if (element) {
-                        element.textContent = button.getAttribute(`data-${field.toLowerCase()}`) || 'N/A';
+                        element.textContent = button.getAttribute(`data-${fieldKey}`) || 'N/A';
                     }
                 });
                 const viewBtn = document.getElementById(modal.viewBtnId);
                 const editBtn = document.getElementById(modal.editBtnId);
                 const deleteForm = document.getElementById(modal.deleteFormId);
-                const blueprint = modal.id.toLowerCase().includes('creditor') ? 'creditors' :
+                const blueprint = modal.id.toLowerCase().includes('inventory') ? 'inventory' :
+                                 modal.id.toLowerCase().includes('creditor') ? 'creditors' :
                                  modal.id.toLowerCase().includes('debtor') ? 'debtors' :
                                  modal.id.toLowerCase().includes('payment') ? 'payments' :
                                  'receipts';
