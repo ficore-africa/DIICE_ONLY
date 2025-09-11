@@ -70,7 +70,7 @@ def index():
     }
     can_interact = False
     show_daily_log_reminder = False
-    user_streak = 0  # Explicitly initialize user_streak
+    streak = 0  # Explicitly initialize streak
     unpaid_debtors = []
     unpaid_creditors = []
     inventory_loss = False
@@ -80,18 +80,19 @@ def index():
         query = {'user_id': str(current_user.id)}
         tax_prep_mode = request.args.get('tax_prep') == '1'
 
-        # Fetch reminders data
+        # Fetch reminders and streak data
         try:
             show_daily_log_reminder = reminders.needs_daily_log_reminder(db, current_user.id)
-            user_streak = reminders.get_user_streak(db, current_user.id) or 0  # Ensure user_streak is always an integer
+            rewards_data = db.rewards.find_one({'user_id': str(current_user.id)})
+            streak = rewards_data.get('streak', 0) if rewards_data else 0  # Fetch streak from rewards collection
             unpaid_debtors, unpaid_creditors = reminders.get_unpaid_debts_credits(db, current_user.id)
             inventory_loss = reminders.detect_inventory_loss(db, current_user.id)
-            logger.debug(f"Calculated user_streak: {user_streak} for user_id: {current_user.id}")
+            logger.debug(f"Calculated streak: {streak} for user_id: {current_user.id}")
         except Exception as e:
             logger.warning(f"Failed to calculate reminders or streak: {str(e)}", 
                           extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
             # Keep defaults for safety
-            user_streak = 0  # Explicitly reset to 0 on failure
+            streak = 0  # Explicitly reset to 0 on failure
             flash(trans('reminder_load_error', default='Unable to load reminders or streak data.'), 'warning')
 
         # Fetch recent data with error handling
@@ -195,7 +196,7 @@ def index():
             stats=stats,
             can_interact=can_interact,
             show_daily_log_reminder=show_daily_log_reminder,
-            user_streak=user_streak,  # Always defined
+            streak=streak,  # Always defined
             unpaid_debtors=unpaid_debtors,
             unpaid_creditors=unpaid_creditors,
             tax_prep_mode=tax_prep_mode,
@@ -217,7 +218,7 @@ def index():
             stats=stats,
             can_interact=False,
             show_daily_log_reminder=False,
-            user_streak=0,  # Ensure user_streak is defined in fallback
+            streak=0,  # Ensure streak is defined in fallback
             unpaid_debtors=[],
             unpaid_creditors=[],
             tax_prep_mode=False,
