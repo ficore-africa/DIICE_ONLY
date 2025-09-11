@@ -83,9 +83,9 @@
                 </div>
                 <h6 class="card-title">{{ trans('streak_title', default='Streak') | escape }}</h6>
                 <p class="card-text">
-                    <span class="h5 text-primary">{{ user_streak }}</span><br>
+                    <span class="h5 text-primary">{{ streak | default(0) }}</span><br>
                     <small class="text-muted">{{ trans('streak_days', default='days of clean record keeping!') | escape }}</small>
-                    {% if user_streak >= 3 %}
+                    {% if streak is defined and streak >= 3 %}
                     <span class="badge bg-warning text-dark ms-2">{{ trans('streak_reward', default='Keep it up!') | escape }}</span>
                     {% endif %}
                 </p>
