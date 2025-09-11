@@ -412,8 +412,18 @@ def create_app():
             logger.warning(f'Error formatting currency {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
             return str(value)
 
+    # Define format_percentage filter
+    def format_percentage(value):
+        try:
+            return "{:.2f}%".format(float(value) * 100)
+        except (ValueError, TypeError) as e:
+            logger.warning(f'Error formatting percentage {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            return "0.00%"
+
     app.jinja_env.filters['format_currency'] = format_currency
     app.jinja_env.globals['format_currency'] = format_currency
+    app.jinja_env.filters['format_percentage'] = format_percentage
+    app.jinja_env.globals['format_percentage'] = format_percentage
 
     @app.template_filter('format_date')
     def format_date_wrapper(value):
