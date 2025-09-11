@@ -132,11 +132,12 @@ def migrate_naive_datetimes():
             'feedback': ['timestamp'],
             'notifications': ['timestamp'],
             'kyc_records': ['created_at', 'updated_at'],
-            'sessions': ['created_at', 'expires_at'],  # Assuming sessions collection exists
-            'tool_usage': ['timestamp'],  # Assuming tool_usage collection exists
-            'reminder_logs': ['timestamp'],  # Assuming reminder_logs collection exists
-            'waitlist': ['created_at', 'updated_at'],  # Added for waitlist collection
-            'rewards': ['created_at', 'expires_at']  # Added for rewards collection
+            'sessions': ['created_at', 'expires_at'],
+            'tool_usage': ['timestamp'],
+            'reminder_logs': ['timestamp'],
+            'waitlist': ['created_at', 'updated_at'],
+            'rewards': ['created_at', 'expires_at', 'redeemed_at'],
+            'payment_receipts': ['payment_date', 'uploaded_at', 'approved_at', 'rejected_at']
         }
 
         for collection_name, datetime_fields in datetime_fields_by_collection.items():
@@ -336,7 +337,7 @@ def initialize_app_data(app):
                             'required': ['user_id', 'type', 'created_at'],
                             'properties': {
                                 'user_id': {'bsonType': 'string'},
-                                'type': {'enum': ['debtor', 'creditor', 'forecast', 'fund', 'investor_report']},
+                                'type': {'enum': ['debtor', 'creditor', 'forecast', 'fund', 'investor_report', 'inventory']},
                                 'name': {'bsonType': ['string', 'null']},
                                 'contact': {'bsonType': ['string', 'null']},
                                 'amount_owed': {'bsonType': ['number', 'null'], 'minimum': 0},
@@ -352,6 +353,8 @@ def initialize_app_data(app):
                                 'report_date': {'bsonType': ['date', 'null']},
                                 'summary': {'bsonType': ['string', 'null']},
                                 'financial_highlights': {'bsonType': ['string', 'null']},
+                                'cost': {'bsonType': ['number', 'null'], 'minimum': 0},
+                                'expected_margin': {'bsonType': ['number', 'null'], 'minimum': 0},
                                 'created_at': {'bsonType': 'date'},
                                 'updated_at': {'bsonType': ['date', 'null']}
                             }
@@ -430,7 +433,7 @@ def initialize_app_data(app):
                                 '_id': {'bsonType': 'objectId'},
                                 'user_id': {'bsonType': ['string', 'null']},
                                 'session_id': {'bsonType': 'string'},
-                                'tool_name': {'enum': ['profile', 'debtors', 'creditors', 'receipts', 'payment', 'report', 'fund', 'investor_report', 'forecast']},
+                                'tool_name': {'enum': ['profile', 'debtors', 'creditors', 'receipts', 'payment', 'report', 'fund', 'investor_report', 'forecast', 'inventory']},
                                 'rating': {'bsonType': 'int', 'minimum': 1, 'maximum': 5},
                                 'comment': {'bsonType': ['string', 'null']},
                                 'timestamp': {'bsonType': 'date'}
@@ -561,7 +564,7 @@ def initialize_app_data(app):
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING)]},
                         {'key': [('status', ASCENDING)]},
                         {'key': [('created_at', DESCENDING)]},
-                        {'key': [('expires_at', ASCENDING)], 'expireAfterSeconds': 31536000}  # 1 year expiration
+                        {'key': [('expires_at', ASCENDING)], 'expireAfterSeconds': 31536000}
                     ]
                 }
             }
@@ -641,6 +644,27 @@ def initialize_app_data(app):
                                    extra={'session_id': 'no-session-id'})
                     except Exception as e:
                         logger.error(f"Failed to create sample reward: {str(e)}", 
+                                    exc_info=True, extra={'session_id': 'no-session-id'})
+                        raise
+            
+            # Add sample inventory record if none exist
+            if 'records' in collections:
+                inventory_exists = db_instance.records.find_one({'type': 'inventory'})
+                if not inventory_exists:
+                    sample_inventory = {
+                        'user_id': 'admin',
+                        'type': 'inventory',
+                        'name': 'Sample Inventory Item',
+                        'cost': 100.0,
+                        'expected_margin': 20.0,
+                        'created_at': datetime.now(timezone.utc)
+                    }
+                    try:
+                        result = db_instance.records.insert_one(sample_inventory)
+                        logger.info(f"Created sample inventory record with ID: {result.inserted_id}", 
+                                   extra={'session_id': 'no-session-id'})
+                    except Exception as e:
+                        logger.error(f"Failed to create sample inventory record: {str(e)}", 
                                     exc_info=True, extra={'session_id': 'no-session-id'})
                         raise
             
@@ -808,7 +832,7 @@ class User:
             bool: True if user is admin or trial/subscription is active, False otherwise
         """
         if self.role == 'admin' or self.is_admin:
-            return True  # Admins always bypass trial/subscription checks
+            return True
         if self.is_subscribed and self.subscription_end:
             subscription_end_aware = (
                 self.subscription_end.replace(tzinfo=timezone.utc)
@@ -1032,7 +1056,7 @@ def update_user(db, user_id, update_data):
 
 def get_records(db, filter_kwargs):
     """
-    Retrieve records (debtors, creditors) based on filter criteria.
+    Retrieve records (debtors, creditors, inventory, etc.) based on filter criteria.
     
     Args:
         db: MongoDB database instance
@@ -1246,7 +1270,7 @@ def get_feedback(db, filter_kwargs):
     
     Args:
         db: MongoDB database instance
-        filter_kwargs: Dictionary of filter criteria (e.g., {'user_id': 'user123', 'tool_name': 'debtors'})
+        filter_kwargs: Dictionary of filter criteria (e.g., {'user_id': 'user123', 'tool_name': 'inventory'})
     
     Returns:
         list: List of feedback entries
@@ -1363,6 +1387,12 @@ def to_dict_record(record):
             'report_date': record.get('report_date'),
             'summary': record.get('summary', ''),
             'financial_highlights': record.get('financial_highlights', '')
+        })
+    elif record['type'] == 'inventory':
+        result.update({
+            'name': record.get('name', ''),
+            'cost': record.get('cost', 0),
+            'expected_margin': record.get('expected_margin', 0)
         })
     return result
 
