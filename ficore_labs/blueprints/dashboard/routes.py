@@ -54,6 +54,7 @@ def index():
     recent_payments = []
     recent_receipts = []
     recent_funds = []
+    recent_inventory = []
     stats = {
         'total_debtors': 0,
         'total_creditors': 0,
@@ -66,11 +67,13 @@ def index():
         'total_receipts_amount': 0,
         'total_funds_amount': 0,
         'total_forecasts': 0,
-        'total_forecasts_amount': 0
+        'total_forecasts_amount': 0,
+        'total_inventory': 0,
+        'total_inventory_cost': 0
     }
     can_interact = False
     show_daily_log_reminder = False
-    streak = 0  # Explicitly initialize streak
+    streak = 0
     unpaid_debtors = []
     unpaid_creditors = []
     inventory_loss = False
@@ -84,21 +87,19 @@ def index():
         try:
             show_daily_log_reminder = reminders.needs_daily_log_reminder(db, current_user.id)
             rewards_data = db.rewards.find_one({'user_id': str(current_user.id)})
-            streak = rewards_data.get('streak', 0) if rewards_data else 0  # Fetch streak from rewards collection
+            streak = rewards_data.get('streak', 0) if rewards_data else 0
             unpaid_debtors, unpaid_creditors = reminders.get_unpaid_debts_credits(db, current_user.id)
             inventory_loss = reminders.detect_inventory_loss(db, current_user.id)
             logger.debug(f"Calculated streak: {streak} for user_id: {current_user.id}")
         except Exception as e:
             logger.warning(f"Failed to calculate reminders or streak: {str(e)}", 
                           extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-            # Keep defaults for safety
-            streak = 0  # Explicitly reset to 0 on failure
+            streak = 0
             flash(trans('reminder_load_error', default='Unable to load reminders or streak data.'), 'warning')
 
         # Fetch recent data with error handling
         try:
             if tax_prep_mode:
-                # Only show profit (sales-expenses) in stats
                 sales = db.records.aggregate([
                     {'$match': {**query, 'type': 'sale'}},
                     {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
@@ -115,6 +116,7 @@ def index():
             recent_payments = list(db.cashflows.find({**query, 'type': 'payment'}).sort('created_at', -1).limit(5))
             recent_receipts = list(db.cashflows.find({**query, 'type': 'receipt'}).sort('created_at', -1).limit(5))
             recent_funds = list(db.records.find({**query, 'type': 'fund'}).sort('created_at', -1).limit(5))
+            recent_inventory = list(db.records.find({**query, 'type': 'inventory'}).sort('created_at', -1).limit(5))
         except Exception as e:
             logger.error(f"Error querying MongoDB for dashboard data: {str(e)}", 
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -141,6 +143,8 @@ def index():
                     item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
                 item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
                 item['_id'] = str(item['_id'])
+                # Rename 'party_name' to match template
+                item['recipient' if item['type'] == 'payment' else 'payer'] = utils.sanitize_input(item.get('party_name', 'N/A'), max_length=100)
             except Exception as e:
                 logger.warning(f"Error processing payment/receipt item {item.get('_id')}: {str(e)}")
                 continue
@@ -149,11 +153,23 @@ def index():
             try:
                 if item.get('created_at') and item['created_at'].tzinfo is None:
                     item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                item['name'] = utils.sanitize_input(item.get('name', ''), max_length=100)
+                item['name'] = utils.sanitize_input(item.get('source', ''), max_length=100)
                 item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
                 item['_id'] = str(item['_id'])
             except Exception as e:
                 logger.warning(f"Error processing fund item {item.get('_id')}: {str(e)}")
+                continue
+
+        for item in recent_inventory:
+            try:
+                if item.get('created_at') and item['created_at'].tzinfo is None:
+                    item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+                item['name'] = utils.sanitize_input(item.get('name', ''), max_length=100)
+                item['cost'] = float(item.get('cost', 0))
+                item['expected_margin'] = float(item.get('expected_margin', 0))
+                item['_id'] = str(item['_id'])
+            except Exception as e:
+                logger.warning(f"Error processing inventory item {item.get('_id')}: {str(e)}")
                 continue
 
         # Calculate stats with safe access
@@ -170,7 +186,9 @@ def index():
                 'total_receipts_amount': sum(doc.get('amount', 0) for doc in db.cashflows.find({**query, 'type': 'receipt'})),
                 'total_funds_amount': sum(doc.get('amount', 0) for doc in db.records.find({**query, 'type': 'fund'})),
                 'total_forecasts': db.records.count_documents({**query, 'type': 'forecast'}),
-                'total_forecasts_amount': sum(doc.get('projected_revenue', 0) for doc in db.records.find({**query, 'type': 'forecast'}))
+                'total_forecasts_amount': sum(doc.get('projected_revenue', 0) for doc in db.records.find({**query, 'type': 'forecast'})),
+                'total_inventory': db.records.count_documents({**query, 'type': 'inventory'}),
+                'total_inventory_cost': sum(doc.get('cost', 0) for doc in db.records.find({**query, 'type': 'inventory'}))
             })
         except Exception as e:
             logger.error(f"Error calculating stats for dashboard: {str(e)}", 
@@ -193,10 +211,11 @@ def index():
             recent_payments=recent_payments,
             recent_receipts=recent_receipts,
             recent_funds=recent_funds,
+            recent_inventory=recent_inventory,
             stats=stats,
             can_interact=can_interact,
             show_daily_log_reminder=show_daily_log_reminder,
-            streak=streak,  # Always defined
+            streak=streak,
             unpaid_debtors=unpaid_debtors,
             unpaid_creditors=unpaid_creditors,
             tax_prep_mode=tax_prep_mode,
@@ -204,7 +223,6 @@ def index():
         )
 
     except Exception as e:
-        # Fallback for critical errors
         logger.critical(f"Critical error in dashboard route: {str(e)}", 
                        extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('dashboard_critical_error', default='An error occurred while loading the dashboard. Please try again later.'), 'danger')
@@ -215,10 +233,11 @@ def index():
             recent_payments=[],
             recent_receipts=[],
             recent_funds=[],
+            recent_inventory=[],
             stats=stats,
             can_interact=False,
             show_daily_log_reminder=False,
-            streak=0,  # Ensure streak is defined in fallback
+            streak=0,
             unpaid_debtors=[],
             unpaid_creditors=[],
             tax_prep_mode=False,
