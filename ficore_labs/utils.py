@@ -286,6 +286,13 @@ def get_explore_features():
 def get_limiter():
     return limiter
 
+def format_percentage(value):
+    """Format a decimal as a percentage (e.g., 0.25 -> 25%)."""
+    try:
+        return "{:.2f}%".format(float(value) * 100)
+    except (ValueError, TypeError):
+        return "0.00%"
+
 def log_tool_usage(action, tool_name=None, details=None, user_id=None, db=None, session_id=None):
     try:
         if db is None:
