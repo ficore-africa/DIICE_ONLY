@@ -5,7 +5,7 @@
 <div class="container">
     <!-- Hero Section -->
     <div class="section-card welcome-section-card text-center mt-5">
-        <p class="lead text-muted mb-4" style="font-weight: 600;">   {{ t('general_business_finance_desc', default='Simplified business finance for traders, startups, and modern entrepreneurs.') | e }}</p>
+        <p class="lead text-muted mb-4" style="font-weight: 600;">{{ t('general_business_finance_desc', default='Simplified business finance for traders, startups, and modern entrepreneurs.') | e }}</p>
         <div class="hero-actions">
             <!-- Primary Auth Actions -->
             <div class="auth-buttons">
@@ -476,5 +476,18 @@ function formatTimeAgo(timestamp) {
     return Math.floor(diffInSeconds / 86400) + ' ' + translations.days_ago;
 }
 </script>
+<!--Start of Tawk.to Script-->
+<script type="text/javascript">
+var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+(function(){
+var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
+s1.async=true;
+s1.src='https://embed.tawk.to/68b6b42c8b5f3419254f3506/1j44qvjhm';
+s1.charset='UTF-8';
+s1.setAttribute('crossorigin','*');
+s0.parentNode.insertBefore(s1,s0);
+})();
+</script>
+<!--End of Tawk.to Script-->
 {% endblock %}
 {% endblock %}
